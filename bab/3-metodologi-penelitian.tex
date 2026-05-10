@@ -94,11 +94,11 @@ Rangkaian proses integrasi sistem adalah sebagai berikut:
 
   \item {Pelacakan Multi-Objek (ByteTrack)}: hasil deteksi dikirim ke algoritma ByteTrack yang memberikan \texttt{track\_id} persisten pada setiap objek lintas frame. ByteTrack dikonfigurasi dengan \textit{track activation threshold} 0{,}4 (membagi deteksi ke tier tinggi dan rendah), \textit{lost track buffer} 60 \textit{frame} (setara $\approx$2{,}4 detik pada FPS sumber 25 FPS atau $\approx$3{,}17 detik pada FPS efektif \textit{pipeline} 18{,}9 FPS), dan \textit{matching threshold} 0{,}85.
 
-  \item {Asosiasi Spasial Rider--Motorcycle (IoA Filter)}: setelah pelacakan, dilakukan validasi spasial antara deteksi \texttt{DRIVER\_NO\_HELMET} dengan objek \texttt{MOTORCYCLE} menggunakan metrik \textit{Intersection over Area} (IoA). IoA mengukur proporsi area \textit{bounding box} pengendara yang beririsan dengan area motor:
+  \item {Asosiasi Spasial \texttt{DRIVER\_NO\_HELMET}--\texttt{MOTORCYCLE} (IoA Filter)}: setelah pelacakan, dilakukan validasi spasial antara \textit{bounding box} kelas \texttt{DRIVER\_NO\_HELMET} dengan \textit{bounding box} kelas \texttt{MOTORCYCLE} menggunakan metrik \textit{Intersection over Area} (IoA). IoA mengukur proporsi area \textit{bounding box} \texttt{DRIVER\_NO\_HELMET} yang beririsan dengan area \texttt{MOTORCYCLE}:
     \begin{equation}
-      \text{IoA}(\text{rider}, \text{motor}) = \frac{|\text{bbox}_{\text{rider}} \cap \text{bbox}_{\text{motor}}|}{|\text{bbox}_{\text{rider}}|}
+      \text{IoA} = \frac{|\text{bbox}_{\texttt{DNH}} \cap \text{bbox}_{\texttt{MC}}|}{|\text{bbox}_{\texttt{DNH}}|}
     \end{equation}
-    Metrik IoA dipilih ketimbang IoU karena \textit{bounding box} pengendara umumnya jauh lebih kecil daripada motor, sehingga IoU akan menghasilkan skor rendah meskipun pengendara jelas berada di atas motor. Pengendara dianggap mengendarai motor jika IoA $\geq$ 0{,}3. Deteksi tanpa asosiasi motor (misalnya pejalan kaki) terfilter pada tahap ini.
+    dengan $\text{bbox}_{\texttt{DNH}}$ adalah \textit{bounding box} kelas \texttt{DRIVER\_NO\_HELMET} dan $\text{bbox}_{\texttt{MC}}$ adalah \textit{bounding box} kelas \texttt{MOTORCYCLE}. Metrik IoA dipilih ketimbang IoU karena \textit{bounding box} \texttt{DRIVER\_NO\_HELMET} umumnya jauh lebih kecil daripada \texttt{MOTORCYCLE}, sehingga IoU menghasilkan skor rendah meskipun pengendara jelas berada di atas motor. Deteksi \texttt{DRIVER\_NO\_HELMET} dianggap valid mengendarai motor jika IoA $\geq$ 0{,}3. Deteksi \texttt{DRIVER\_NO\_HELMET} tanpa asosiasi terhadap \texttt{MOTORCYCLE} (misalnya pejalan kaki) terfilter pada tahap ini.
 
   \item {Logika Evaluasi Pelanggaran Helm}: berdasarkan hasil pelacakan dan asosiasi spasial, sistem menerapkan konfirmasi temporal \textit{N-frame} dengan kriteria sebagai berikut:
   \begin{enumerate}[1).]
