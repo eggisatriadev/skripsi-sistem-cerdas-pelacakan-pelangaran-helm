@@ -24,7 +24,7 @@ Pengembangan dan pengujian sistem dilakukan pada satu unit laptop dengan spesifi
 \end{table}
 
 \section{Deskripsi Data}
-Subbab ini menjelaskan deskripsi data yang digunakan dalam penelitian, meliputi jenis dan sumber data, proses anotasi, serta strategi augmentasi. Uraian rinci setiap aspek disajikan pada subsubbab berikutnya sebagai dasar pembentukan dataset dan evaluasi model.
+Subbab ini memerinci data penelitian yang meliputi jenis dan sumber data, proses anotasi, dan strategi augmentasi. Uraian setiap aspek disajikan pada subsubbab berikutnya sebagai dasar pembentukan dataset dan evaluasi model.
 \subsection{Jenis dan Sumber Data}
 Data yang digunakan dalam penelitian ini dikategorikan menjadi dua jenis utama berdasarkan asal dan perannya dalam sistem, yaitu data primer dan data sekunder.
 
@@ -70,7 +70,7 @@ Augmentasi diterapkan hanya pada data latih untuk mengurangi \textit{overfitting
 \end{table}
 
 \section{Arsitektur Sistem}
-Sistem dibangun dengan \textit{Kappa Architecture} \cite{kreps2014questioning}, yang menempatkan pemrosesan aliran data sebagai jalur utama. Arsitektur ini terdiri atas enam lapisan utama dan ditunjukkan pada Gambar~\ref{fig:architecture}. Secara ringkas, aliran data dimulai dari lapisan \textit{Data Source} sebagai sumber video CCTV yang telah disertai identitas kamera, resolusi, dan posisi geospasial, lalu diteruskan ke lapisan \textit{Ingestion \& Edge Intelligence} untuk akuisisi, pra-pemrosesan \textit{frame}, serta penambahan stempel waktu dan metadata teknis. Data berikutnya dikirim ke lapisan \textit{Buffering} menggunakan Apache Kafka sebagai \textit{message broker} agar aliran data tetap andal, skalabel, dan berurutan per kamera. Setelah itu, lapisan \textit{Stream Processing} memproses \textit{event} secara \textit{real-time} dengan Apache Spark Structured Streaming melalui validasi skema, deduplikasi, dan agregasi singkat sebelum hasilnya disimpan pada lapisan \textit{Persistence} ke dalam \textit{data mart} berdesain skema bintang dengan mekanisme \textit{upsert}. Pada tahap akhir, lapisan \textit{Presentation} memanfaatkan Grafana Dashboard untuk menyajikan hasil analitik secara \textit{real-time} melalui visualisasi yang mendukung pemantauan dan pengambilan keputusan operasional secara cepat dan terarah.
+Sistem dibangun dengan \textit{Kappa Architecture} \cite{kreps2014questioning} yang menempatkan pemrosesan aliran data sebagai jalur utama. Gambar~\ref{fig:architecture} memperlihatkan enam lapisan utama arsitektur tersebut. Lapisan \textit{Data Source} menyuplai video CCTV beserta identitas kamera, resolusi, dan posisi geospasial. Lapisan \textit{Ingestion \& Edge Intelligence} menangani akuisisi, pra-pemrosesan \textit{frame}, dan penambahan stempel waktu serta metadata teknis. Lapisan \textit{Buffering} memakai Apache Kafka sebagai \textit{message broker} agar aliran data tetap andal, skalabel, dan berurutan per kamera. Lapisan \textit{Stream Processing} memproses \textit{event} secara \textit{real-time} pada Apache Spark Structured Streaming melalui validasi skema, deduplikasi, dan agregasi singkat. Lapisan \textit{Persistence} menyimpan hasil pada \textit{data mart} berskema bintang dengan mekanisme \textit{upsert}. Lapisan \textit{Presentation} menyajikan hasil analitik melalui Grafana Dashboard untuk menopang pemantauan dan pengambilan keputusan operasional.
 
 \begin{figure}[H]
   \centering
@@ -98,7 +98,7 @@ Rangkaian proses integrasi sistem adalah sebagai berikut:
     \begin{equation}
       \text{IoA}(\text{rider}, \text{motor}) = \frac{|\text{bbox}_{\text{rider}} \cap \text{bbox}_{\text{motor}}|}{|\text{bbox}_{\text{rider}}|}
     \end{equation}
-    Metrik IoA dipilih ketimbang IoU karena \textit{bounding box} pengendara umumnya jauh lebih kecil daripada motor — IoU akan menghasilkan skor rendah meskipun pengendara jelas berada di atas motor. Pengendara dianggap mengendarai motor jika IoA $\geq$ 0{,}3. Deteksi tanpa asosiasi motor (misalnya pejalan kaki) terfilter pada tahap ini.
+    Metrik IoA dipilih ketimbang IoU karena \textit{bounding box} pengendara umumnya jauh lebih kecil daripada motor, sehingga IoU akan menghasilkan skor rendah meskipun pengendara jelas berada di atas motor. Pengendara dianggap mengendarai motor jika IoA $\geq$ 0{,}3. Deteksi tanpa asosiasi motor (misalnya pejalan kaki) terfilter pada tahap ini.
 
   \item {Logika Evaluasi Pelanggaran Helm}: berdasarkan hasil pelacakan dan asosiasi spasial, sistem menerapkan konfirmasi temporal \textit{N-frame} dengan kriteria sebagai berikut:
   \begin{enumerate}[1).]
