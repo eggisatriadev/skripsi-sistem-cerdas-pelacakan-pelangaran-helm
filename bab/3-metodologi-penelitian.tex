@@ -30,9 +30,34 @@ Data yang digunakan dalam penelitian ini dikategorikan menjadi dua jenis utama b
 
 \begin{enumerate}[a.]
   \item Data Primer:
-    Data primer berupa rekaman video CCTV yang diperoleh dari Unit K3L Institut Teknologi Sumatera (Itera) berdasarkan izin resmi tertulis. Data yang digunakan merupakan rekaman luring (\textit{non-real-time}) dari satu kamera CCTV yang terpasang di gerbang utama kampus. Rekaman mencakup periode pengamatan satu hari, yaitu 5 Februari 2026, dengan rentang waktu perekaman pukul 07.00 hingga 17.00 WIB.
-
-    Rekaman ini merepresentasikan arus lalu lintas utama kendaraan bermotor yang masuk dan keluar area kampus, sehingga relevan untuk analisis pelanggaran penggunaan helm di lingkungan kampus.
+  Data primer berupa rekaman video CCTV yang diperoleh dari Unit K3L Institut Teknologi Sumatera (ITERA) berdasarkan izin resmi tertulis. Rekaman berasal dari satu unit kamera CCTV yang terpasang di gerbang utama kampus pada posisi tetap (\textit{static CCTV}) dengan sudut pandang mengarah ke arus lalu lintas kendaraan bermotor yang masuk dan keluar area kampus. Periode pengamatan penuh mencakup satu hari, yaitu 5 Februari 2026, dengan rentang waktu perekaman pukul 07.00 hingga 17.00 WIB (10 jam).
+ 
+ .Spesifikasi teknis cuplikan rekaman tersebut disajikan pada Tabel~\ref{tab:metadata-video}.
+ 
+  \begin{table}[htpb]
+    \centering
+    \caption{Spesifikasi Teknis Rekaman Video CCTV (\texttt{test.mp4})}
+    \label{tab:metadata-video}
+    \begin{tabular}{p{0.45\textwidth} p{0.4\textwidth}}
+      \toprule
+      \textbf{Parameter} & \textbf{Nilai} \\
+      \midrule
+      Resolusi (\textit{frame}) & 1.280 $\times$ 720 piksel (720p HD) \\
+      \textit{Aspect ratio} & 16:9 (1,7778) \\
+      \textit{Frame rate} (FPS) & 25 frame/detik \\
+      Estimasi \textit{bitrate} & $\approx$1,85 Mbps \\
+      Ruang warna & RGB (\textit{OpenCV CAP\_PROP\_CONVERT\_RGB}=1) \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+ 
+  
+ 
+  Resolusi 1.280 $\times$ 720 piksel (720p) dipilih sebagai kompromi antara kebutuhan detail visual untuk deteksi objek kecil (helm pada pengendara) dengan batasan kapasitas pemrosesan pada perangkat keras yang digunakan. Pada resolusi ini, objek helm berukuran relatif kecil (rata-rata $\approx$30--60 piksel tinggi) masih dapat dideteksi oleh model YOLOv8 dengan skor kepercayaan memadai, sementara beban komputasi inferensi tetap dapat dijalankan pada GPU terintegrasi (\textit{integrated graphics}) tanpa degradasi \textit{throughput} yang signifikan.
+ 
+  \textit{Frame rate} 25 FPS merupakan standar perekaman CCTV yang umum digunakan di Indonesia dan sesuai dengan spesifikasi perangkat keras kamera yang terpasang. Nilai ini memberikan interval antar-\textit{frame} sebesar 40 milidetik, yang memadai untuk pelacakan objek bergerak menggunakan algoritma ByteTrack dengan buffer \textit{lost track} 60 frame ($\approx$2,4 detik).
+ 
+  Rekaman ini merepresentasikan arus lalu lintas utama kendaraan bermotor yang masuk dan keluar area kampus, sehingga secara kontekstual relevan untuk analisis pelanggaran penggunaan helm di lingkungan kampus ITERA.
 
   \item Data Sekunder:
     Untuk mendukung pelatihan dan evaluasi model deteksi objek berbasis YOLOv8, penelitian ini menggunakan data sekunder berupa \textit{ITERA Helmet Dataset}. Dataset ini dibangun dari data primer melalui ekstraksi \textit{frame} secara selektif. Pengambilan \textit{frame} dilakukan berdasarkan kondisi visual yang memadai untuk deteksi objek, sehingga diperoleh 390 \textit{frame} yang representatif. Dataset kemudian dianotasi secara manual dengan tiga kelas target: \texttt{DRIVER\_HELMET}, \texttt{DRIVER\_NO\_HELMET}, dan \texttt{MOTORCYCLE}.
