@@ -30,9 +30,7 @@ Data yang digunakan dalam penelitian ini dikategorikan menjadi dua jenis utama b
 
 \begin{enumerate}[a.]
   \item Data Primer:
-  Data primer berupa rekaman video CCTV yang diperoleh dari Unit K3L Institut Teknologi Sumatera (ITERA) berdasarkan izin resmi tertulis. Rekaman berasal dari satu unit kamera CCTV yang terpasang di gerbang utama kampus pada posisi tetap (\textit{static CCTV}) dengan sudut pandang mengarah ke arus lalu lintas kendaraan bermotor yang masuk dan keluar area kampus. Periode pengamatan penuh mencakup satu hari, yaitu 5 Februari 2026, dengan rentang waktu perekaman pukul 07.00 hingga 17.00 WIB (10 jam).
- 
- .Spesifikasi teknis cuplikan rekaman tersebut disajikan pada Tabel~\ref{tab:metadata-video}.
+  Data primer berupa rekaman video CCTV yang diperoleh dari Unit K3L Institut Teknologi Sumatera (ITERA) berdasarkan izin resmi tertulis. Rekaman berasal dari satu unit kamera CCTV yang terpasang di gerbang utama kampus pada posisi tetap (\textit{static CCTV}) dengan sudut pandang mengarah ke arus lalu lintas kendaraan bermotor yang masuk dan keluar area kampus. Periode pengamatan penuh mencakup satu hari, yaitu 5 Februari 2026, dengan rentang waktu perekaman pukul 07.00 hingga 17.00 WIB (10 jam). Spesifikasi teknis cuplikan rekaman tersebut disajikan pada Tabel~\ref{tab:metadata-video}.
  
   \begin{table}[htpb]
     \centering
@@ -95,7 +93,21 @@ Augmentasi diterapkan hanya pada data latih untuk mengurangi \textit{overfitting
 \end{table}
 
 \section{Arsitektur Sistem}
-Sistem dibangun dengan \textit{Kappa Architecture} \cite{kreps2014questioning} yang menempatkan pemrosesan aliran data sebagai jalur utama. Gambar~\ref{fig:architecture} memperlihatkan enam lapisan utama arsitektur tersebut. Lapisan \textit{Data Source} menyuplai video CCTV beserta identitas kamera, resolusi, dan posisi geospasial. Lapisan \textit{Ingestion \& Edge Intelligence} menangani akuisisi, pra-pemrosesan \textit{frame}, dan penambahan stempel waktu serta metadata teknis. Lapisan \textit{Buffering} memakai Apache Kafka sebagai \textit{message broker} agar aliran data tetap andal, skalabel, dan berurutan per kamera. Lapisan \textit{Stream Processing} memproses \textit{event} secara \textit{real-time} pada Apache Spark Structured Streaming melalui validasi skema, deduplikasi, dan agregasi singkat. Lapisan \textit{Persistence} menyimpan hasil pada \textit{data mart} berskema bintang dengan mekanisme \textit{upsert}. Lapisan \textit{Presentation} menyajikan hasil analitik melalui Grafana Dashboard untuk menopang pemantauan dan pengambilan keputusan operasional.
+Sistem dibangun dengan \textit{Kappa Architecture} \cite{kreps2014questioning} yang menempatkan pemrosesan aliran data sebagai jalur utama. Gambar~\ref{fig:architecture} memperlihatkan enam lapisan utama yang saling bersambung sebagai berikut.
+
+\begin{enumerate}[a.]
+  \item \textbf{\textit{Data Source}}: menyuplai aliran video CCTV beserta identitas kamera, resolusi, dan posisi geospasial yang menjadi konteks setiap \textit{frame}.
+
+  \item \textbf{\textit{Ingestion \& Edge Intelligence}}: menangani akuisisi \textit{frame}, pra-pemrosesan ringan, serta penambahan stempel waktu dan metadata teknis sebelum aliran dilepas ke pialang pesan.
+
+  \item \textbf{\textit{Buffering}}: memakai Apache Kafka sebagai \textit{message broker} sehingga aliran peristiwa tetap andal, skalabel, dan berurutan per kamera meski konsumen di hilir sesekali tertunda.
+
+  \item \textbf{\textit{Stream Processing}}: mengolah \textit{event} pada Apache Spark Structured Streaming melalui validasi skema, deduplikasi, dan agregasi singkat sehingga keluarannya siap dipersistenkan.
+
+  \item \textbf{\textit{Persistence}}: menyimpan hasil olahan pada \textit{data mart} PostgreSQL berskema bintang dengan mekanisme \textit{upsert} untuk menjaga konsistensi catatan pelanggaran lintas waktu.
+
+  \item \textbf{\textit{Presentation}}: menyajikan hasil analitik melalui \textit{dashboard} Grafana sebagai antarmuka pemantauan dan basis pengambilan keputusan operasional.
+\end{enumerate}
 
 \begin{figure}[H]
   \centering
@@ -130,7 +142,9 @@ Komponen galat         & \textit{box loss} + \textit{class loss} + \textit{distr
 \end{tabular}
 \end{table}
 
-Pelatihan model dilakukan pada layanan terkelola Roboflow Train 3.0 dengan varian \textit{Roboflow 3.0 Object Detection (Fast)}, bukan pada lingkungan Ultralytics murni. Pertimbangannya pragmatis: platform menyediakan dasbor pemantauan, penyimpanan dataset terversi, dan jalur distribusi model siap-API yang menyingkat siklus pengembangan tesis \cite{roboflowdocs2025,roboflowblog2023}. Roboflow 3.0 merupakan arsitektur internal Roboflow yang menurunkan tiga komponen galat khas YOLOv8 yaitu \textit{box loss}, \textit{class loss}, dan \textit{distribution focal loss} (DFL); kemunculan ketiga galat ini pada Gambar~\ref{fig:train-loss} dan Gambar~\ref{fig:val-loss} di Bab 4 menjadi bukti turunan tersebut. Roboflow tidak membuka detail modifikasi internal pada \textit{backbone}, \textit{neck}, atau \textit{head} sehingga arsitektur Roboflow 3.0 (Fast) tidak dapat dijelaskan lebih dalam di luar fakta bahwa ia berasal dari keluarga YOLOv8n. Konsekuensinya, \textit{learning rate}, \textit{optimizer}, momentum, \textit{weight decay}, dan bobot komponen galat tidak terbuka untuk diatur pengguna karena platform menentukannya secara internal demi menjaga reprodusibilitas pada infrastruktur terkelola. Praktik melaporkan Roboflow 3.0 sebagai model yang setara dengan keluarga YOLO sudah lazim pada literatur perbandingan kontemporer \cite{solano2025roboflow}.
+Pelatihan model dijalankan pada layanan terkelola Roboflow Train 3.0 dengan varian \textit{Roboflow 3.0 Object Detection (Fast)}, bukan pada lingkungan Ultralytics murni. Pertimbangannya pragmatis: platform menyediakan \textit{dashboard} pemantauan, penyimpanan dataset terversi, dan jalur distribusi model siap-API yang menyingkat siklus pengembangan tesis \cite{roboflowdocs2025,roboflowblog2023}. Roboflow 3.0 merupakan arsitektur internal Roboflow yang menurunkan tiga komponen galat khas YOLOv8---\textit{box loss}, \textit{class loss}, dan \textit{distribution focal loss} (DFL)---dan kemunculan ketiganya pada Gambar~\ref{fig:train-loss} serta Gambar~\ref{fig:val-loss} di Bab 4 menjadi bukti turunan tersebut.
+
+Roboflow tidak membuka detail modifikasi internal pada \textit{backbone}, \textit{neck}, atau \textit{head}, sehingga arsitektur Roboflow 3.0 (Fast) tidak dapat dijelaskan lebih dalam di luar fakta bahwa ia berasal dari keluarga YOLOv8n. Konsekuensinya, \textit{learning rate}, \textit{optimizer}, momentum, \textit{weight decay}, dan bobot komponen galat tidak terbuka untuk diatur pengguna karena platform menetapkannya secara internal demi menjaga reprodusibilitas pada infrastruktur terkelola. Praktik melaporkan Roboflow 3.0 sebagai model yang setara dengan keluarga YOLO sudah lazim pada literatur perbandingan kontemporer \cite{solano2025roboflow}, sehingga keterbatasan transparansi ini tidak menghalangi posisi model dalam ekosistem YOLO.
 
 Meskipun hyperparameter tingkat-bawah tidak dapat diintervensi, sejumlah konfigurasi tingkat-atas tetap dapat ditetapkan oleh pengguna dan menjadi bagian dari catatan pelatihan tesis ini. Rincian konfigurasi tersaji pada Tabel~\ref{tab:hyperparameter-pelatihan}. Resolusi masukan ditetapkan pada $640 \times 640$ piksel mengikuti \textit{default} keluarga YOLOv8 yang sengaja dipilih agar kelipatan \textit{stride} 32 terpenuhi tanpa \textit{padding} yang menggeser posisi \textit{bounding box}. Pelatihan berlangsung selama 300 \textit{epoch} dengan inisialisasi bobot dari \textit{checkpoint} COCO bawaan Roboflow yang diturunkan dari pra-pelatihan YOLOv8n pada Microsoft COCO 2017. Strategi \textit{transfer learning} ini mempercepat konvergensi pada dataset kustom berukuran sedang dan menjadi praktik standar pada \textit{framework} Ultralytics \cite{ultralyticsDocs}. Konfigurasi augmentasi pada Tabel~\ref{tab:augmentasi} mencerminkan augmentasi sisi platform yang diaktifkan saat pelatihan berlangsung. Untuk hyperparameter optimasi yang ditutup platform, sebagai acuan terdokumentasi, Ultralytics mengumumkan nilai \textit{default}: \textit{optimizer} = \texttt{auto} (memilih SGD atau AdamW tergantung ukuran model), \textit{learning rate} awal $\text{lr0}=0{,}01$, momentum 0,937, \textit{weight decay} $5 \times 10^{-4}$, \textit{warmup} 3 \textit{epoch}, dan bobot galat $\lambda_{\text{box}}=7{,}5$, $\lambda_{\text{cls}}=0{,}5$, $\lambda_{\text{dfl}}=1{,}5$ \cite{ultralyticsCfg}. Nilai aktual yang dipakai Roboflow Train 3.0 (Fast) tidak dipublikasikan, namun reprodusibilitas hasil dijamin lewat penguncian versi dataset dan versi model di platform sehingga eksperimen ulang dapat dilakukan pihak ketiga. Pelatihan menghasilkan berkas \textit{best.pt} berisi bobot terbaik untuk inferensi pada lapisan \textit{Ingestion \& Edge Intelligence}.
 
@@ -191,7 +205,7 @@ Bagian ini menjelaskan rancangan \textit{data mart} desain skema bintang sebagai
 
 
 \subsection{Desain Skema Bintang (Star Schema)}
-Pendekatan skema bintang pada Gambar~\ref{fig:stardesign} menempatkan \texttt{fact\_violations} sebagai tabel fakta pusat dan tabel dimensi sebagai pengaya konteks waktu, lokasi, dan jenis pelanggaran. Rancangan ini dipilih karena membuat proses agregasi lebih efisien serta mendukung kebutuhan analisis operasional dan pengembangan dashboard tanpa mengubah struktur data inti.
+Pendekatan skema bintang pada Gambar~\ref{fig:stardesign} menempatkan \texttt{fact\_violations} sebagai tabel fakta pusat dan tabel dimensi sebagai pengaya konteks waktu, lokasi, dan jenis pelanggaran. Rancangan ini dipilih karena membuat proses agregasi lebih efisien serta mendukung kebutuhan analisis operasional dan pengembangan \textit{dashboard} tanpa mengubah struktur data inti.
 
 \begin{figure}[H]
 \centering
@@ -200,8 +214,13 @@ Pendekatan skema bintang pada Gambar~\ref{fig:stardesign} menempatkan \texttt{fa
 \label{fig:stardesign}
 \end{figure}
 
-\section{Rancangan Dashboard Analitik}
-Visualisasi hasil deteksi dan pelacakan dirancang dengan \textit{Grafana} yang terhubung ke \textit{data mart} untuk menyajikan ringkasan operasional dan historis secara cepat. Dashboard memuat indikator utama seperti total pelanggaran, jam tersibuk, dan rata-rata jeda antar-pelanggaran, serta analisis tren melalui grafik deret waktu 15 menit, akumulasi harian, dan komposisi periode pagi, siang, dan sore. Selain itu, dashboard juga menampilkan performa sistem dan model melalui distribusi tingkat keyakinan deteksi dan latensi pemrosesan, serta analisis strategis berupa peta panas temporal dan tabel agregat seperti \textit{Top 5 Jam Tersibuk} untuk mendukung pemantauan dan pengambilan keputusan secara lebih efisien.
+\section{Rancangan \textit{Dashboard} Analitik}
+\label{sec:rancangan-dashboard}
+\textit{Dashboard} analitik dirancang sebagai antarmuka utama bagi UPT K3L dan unit pengamanan kampus untuk membaca pola pelanggaran helm yang sudah dimuat ke \textit{data mart}. Visualisasi dibangun di atas Grafana yang terhubung langsung ke PostgreSQL melalui kueri SQL berorientasi agregasi, sehingga panel hanya menarik data yang relevan dengan rentang waktu yang dipilih operator. Susunan panel mengikuti tiga ranah pertanyaan analitik: \textit{apa yang terjadi}, \textit{kapan dan di mana terjadi}, serta \textit{bagaimana sistem berperilaku}.
+
+Ranah pertama, ringkasan operasional, menampilkan empat indikator kunci---total pelanggaran, jam tersibuk, rata-rata jeda antar-pelanggaran, dan total deteksi yang berhasil di-\textit{upsert}---sebagai panel \textit{stat} di baris paling atas. Ranah kedua, dinamika spasiotemporal, memetakan kepadatan pelanggaran melalui grafik deret waktu beragregat 15 menit, akumulasi harian, distribusi tipikal per periode pagi--siang--sore, dan peta panas \textit{hour-of-day} untuk membaca jam rawan secara cepat. Tabel agregat seperti \textit{Top 5 Jam Tersibuk} melengkapi panel grafis tersebut sebagai daftar berurut yang siap dijadikan acuan jadwal patroli.
+
+Ranah ketiga, kesehatan sistem dan model, menyajikan distribusi tingkat keyakinan deteksi, sebaran latensi inferensi, serta penghitung peristiwa yang tertolak filter spasial-temporal. Tiga panel tersebut sengaja diletakkan terpisah dari ranah operasional agar operator non-teknis tidak dibebani metrik internal, namun tetap dapat diakses pengembang ketika mengaudit kualitas \textit{pipeline}. Dengan tata letak tersebut, satu jendela \textit{dashboard} cukup untuk menjawab pertanyaan strategis (jam dan titik rawan), pertanyaan operasional (berapa banyak yang terjadi), dan pertanyaan diagnostik (apakah \textit{pipeline} sehat) tanpa berpindah halaman.
 
 \section{Alur Penelitian}
 \label{sec:alur_penelitian}
@@ -236,7 +255,7 @@ Tahap ini membangun pipeline streaming terdistribusi untuk mengubah deteksi ment
 Tahap terakhir mengonsolidasikan data operasional ke \textit{data mart} analitik dan mengevaluasi fungsionalitas akhir sistem.
 \begin{enumerate}[a.]
 \item {Pemuatan data ke skema bintang}: data dimuat ke PostgreSQL dengan desain \textit{star schema}. Skema ini memisahkan tabel fakta (\texttt{fact\_violations}) dan tabel dimensi (\texttt{dim\_camera}, \texttt{dim\_time}, \texttt{dim\_violation\_type}) untuk mempercepat kueri agregasi.
-\item {Visualisasi dasbor analitik}: antarmuka pemantauan dibangun di Grafana yang terhubung langsung ke \textit{data mart} untuk menyajikan metrik operasional secara interaktif.
+\item {Visualisasi \textit{dashboard} analitik}: antarmuka pemantauan dibangun di Grafana yang terhubung langsung ke \textit{data mart} untuk menyajikan metrik operasional secara interaktif.
 \end{enumerate}
 
 \begin{figure}[p]

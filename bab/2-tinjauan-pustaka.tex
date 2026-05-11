@@ -3,29 +3,23 @@
 \chapter{TINJAUAN PUSTAKA}
 
 \section{Penelitian Terdahulu}
-Dibandingkan dengan lima penelitian pada Tabel~\ref{tab:penelitian_terdahulu},
-studi ini berfokus pada pengembangan sistem end-to-end. Sistem yang diusulkan
-mengintegrasikan deteksi, pelacakan, dan evaluasi kinerja simpang secara
-real-time dengan model YOLOv8 dan arsitektur \textit{big data streaming}.
-Pendekatan ini melampaui studi terdahulu yang umumnya berhenti pada deteksi
-atau pelacakan. Luarannya adalah analisis lalu lintas yang lebih adaptif dan
-terukur melalui alur otomatis.
+Tabel~\ref{tab:penelitian_terdahulu} merangkum empat penelitian terdahulu yang relevan, mulai dari evaluasi kinerja simpang berbasis kamera omnidirectional sampai pelacakan multiobjek udara berbasis Kafka--Spark. Empat kolom utama yang dibandingkan adalah peneliti dan judul, metodologi, data uji, dan hasil utama; satu kolom tambahan menampilkan celah penelitian masing-masing. Pola yang terbaca cukup jelas: tiga dari empat studi menempati salah satu blok pekerjaan---deteksi saja (\cite{aboah2023helmet}), pelacakan saja (\cite{liu2025vehicle}), atau evaluasi kinerja simpang dengan modul deteksi sebagai pendukung (\cite{alunjati2025intersection})---dan hanya satu (\cite{do2025ramots}) yang menyentuh jalur \textit{stream processing} dari ujung ke ujung. Celah yang muncul berulang adalah ketiadaan rangkaian lengkap deteksi--pelacakan--filter spasial-temporal--distribusi peristiwa--persistensi pada satu sistem yang diuji di lingkungan kampus tropis. Penelitian ini mengisi celah tersebut dengan mengintegrasikan YOLOv8, ByteTrack, filter \textit{Intersection over Area}, konfirmasi temporal \textit{N-Frame}, serta jalur Apache Kafka--Apache Spark Structured Streaming yang berhilir pada \textit{data mart} PostgreSQL.
 
 \vspace{0.5\baselineskip}
 
 {\footnotesize
   \setlength{\tabcolsep}{4pt}
-  \begin{longtable}{@{}>{\RaggedRight\arraybackslash}p{0.23\textwidth} >{\RaggedRight\arraybackslash}p{0.25\textwidth} >{\RaggedRight\arraybackslash}p{0.14\textwidth} >{\RaggedRight\arraybackslash}p{0.30\textwidth}@{}}
+  \begin{longtable}{@{}>{\RaggedRight\arraybackslash}p{0.20\textwidth} >{\RaggedRight\arraybackslash}p{0.20\textwidth} >{\RaggedRight\arraybackslash}p{0.11\textwidth} >{\RaggedRight\arraybackslash}p{0.21\textwidth} >{\RaggedRight\arraybackslash}p{0.20\textwidth}@{}}
     \caption{Ringkasan Penelitian Terdahulu}
     \label{tab:penelitian_terdahulu} \\
     \toprule
-    \textbf{Peneliti \& Judul} & \textbf{Metodologi} & \textbf{Data} & \textbf{Hasil Utama} \\
+    \textbf{Peneliti \& Judul} & \textbf{Metodologi} & \textbf{Data} & \textbf{Hasil Utama} & \textbf{Celah / Posisi terhadap Penelitian Ini} \\
     \midrule
     \endfirsthead
 
     \caption[]{Ringkasan Penelitian Terdahulu} \\
     \toprule
-    \textbf{Peneliti \& Judul} & \textbf{Metodologi} & \textbf{Data} & \textbf{Hasil Utama} \\
+    \textbf{Peneliti \& Judul} & \textbf{Metodologi} & \textbf{Data} & \textbf{Hasil Utama} & \textbf{Celah / Posisi terhadap Penelitian Ini} \\
     \midrule
     \endhead
 
@@ -39,25 +33,29 @@ terukur melalui alur otomatis.
     \textit{Architecture of Four-Arm Intersection Performance Evaluation System Based on Turn Movement Count and Omnidirectional Camera.}(2025) &
     Sistem evaluasi simpang \textit{real-time} berbasis kamera omnidirectional dan YOLO (v5, v8, v11) untuk \textit{turn movement count}. &
     CCTV ATCS Sedayu (2 hari). &
-    YOLOv11 (batch 32): \textbf{mAP 93\%, F1 91\%, FPS 53}; \textit{occlusion} berkurang, tetapi sensitif terhadap cahaya ekstrem. \\
+    YOLOv11 (batch 32): \textbf{mAP 93\%, F1 91\%, FPS 53}; \textit{occlusion} berkurang, tetapi sensitif terhadap cahaya ekstrem. &
+    Fokus pada pencacahan arus simpang, belum membahas validasi pelanggaran spasial-temporal maupun jalur \textit{event stream} ke \textit{data mart}. \\
 
     \textbf{Liu et al. \cite{liu2025vehicle}} \newline
     \textit{Vehicle Flow Detection dengan YOLOv8n + ByteTrack.}(2025) &
     Integrasi MSN-YOLOv8n (SEAM, NWD Loss) dan ByteTrack--ReID untuk deteksi serta pelacakan kendaraan kecil. &
     UA-DETRAC. &
-    \textbf{mAP 62.8\%}, \textbf{MOTA 72.16\%}; stabil untuk objek kecil, tetapi baru diuji pada satu dataset dan belum \textit{streaming real-time}. \\
+    \textbf{mAP 62.8\%}, \textbf{MOTA 72.16\%}; stabil untuk objek kecil, tetapi baru diuji pada satu dataset dan belum \textit{streaming real-time}. &
+    Belum diuji pada aliran video langsung; tidak ada lapisan distribusi peristiwa untuk konsumsi analitik di hilir. \\
 
     \textbf{Aboah et al. \cite{aboah2023helmet}} \newline
     \textit{Real-Time Multi-Class Helmet Violation Detection Using Few-Shot Data Sampling Technique and YOLOv8.}(2023) &
     YOLOv8 dengan \textit{few-shot data sampling} untuk deteksi pelanggaran helm multikelas. &
     AI City 2023 Track 5. &
-    YOLOv8+TTA: mAP 0.5861, 95 FPS, peringkat 7/192; efisien untuk implementasi \textit{real-time} \textit{smart city}. \\
+    YOLOv8+TTA: mAP 0.5861, 95 FPS, peringkat 7/192; efisien untuk implementasi \textit{real-time} \textit{smart city}. &
+    Berhenti pada deteksi tingkat \textit{frame}; tidak ada filter spasial IoA, konfirmasi temporal \textit{N-Frame}, atau persistensi ke \textit{data mart}. \\
 
     \textbf{Do et al. \cite{do2025ramots}} \newline
     \textit{RAMOTS: Real-Time Aerial Multi-Object Tracking.}(2025) &
     Pelacakan multiobjek UAV dengan YOLOv8/v10 + BYTETrack pada arsitektur Kafka--Spark. &
     Video UAV. &
-    \textbf{HOTA 48.14}, \textbf{28 FPS}; efektif untuk udara, namun menurun di lingkungan darat dan masih bergantung satu GPU. \\
+    \textbf{HOTA 48.14}, \textbf{28 FPS}; efektif untuk udara, namun menurun di lingkungan darat dan masih bergantung satu GPU. &
+    Skenario udara dan tanpa GPU di sisi tepi belum dieksplorasi; penelitian ini menguji jalur Kafka--Spark pada CCTV darat berbasis CPU. \\
 
 \end{longtable}}
 
@@ -84,15 +82,10 @@ kurang efisien. Karakteristik utama \textit{Big Data} dikenal sebagai "5V"
 
 \item \textit{Veracity}: Keandalan dan akurasi data harus dijaga melalui proses validasi untuk menekan \textit{false positive} dan \textit{false negative}.
 
-\item \textit{Value}: Data perlu menghasilkan nilai guna, misalnya dalam bentuk dasbor analitik untuk mendukung pengambilan keputusan.
+\item \textit{Value}: Data perlu menghasilkan nilai guna, misalnya dalam bentuk \textit{dashboard} analitik untuk mendukung pengambilan keputusan.
 \end{enumerate}
 
-Penelitian ini menghadapi tantangan utama pada aspek \textit{volume} dan
-\textit{velocity}. Kondisi tersebut mendorong penggunaan
-\textit{stream processing} dibandingkan \textit{batch processing}. Salah satu
-pendekatan yang relevan adalah \textit{Kappa Architecture}, yang memungkinkan
-pemrosesan historis dan \textit{real-time} melalui satu alur data
-\cite{marz2015big}.
+Penelitian ini menghadapi tantangan terbesar pada aspek \textit{volume} dan \textit{velocity}: aliran video CCTV bekerja terus-menerus dengan resolusi tinggi sehingga \textit{batch processing} berbasis siklus pemuatan tidak realistis untuk dipakai sebagai jalur utama. Karena alasan tersebut, \textit{stream processing} menjadi pilihan lebih sesuai, dan salah satu kerangka kerja yang relevan adalah \textit{Kappa Architecture} yang mengonsolidasikan jalur historis dan \textit{real-time} menjadi satu alur data \cite{marz2015big}.
 
 \subsection{Arsitektur Streaming: \textit{Kappa Architecture}}
 
@@ -175,37 +168,7 @@ informasi historis lintas aliran data. Mekanisme ini dapat diimplementasikan
 melalui fungsi \textit{mapGroupsWithState} untuk membentuk \textit{state}
 pada setiap grup data, serta \textit{flatMapGroupsWithState} untuk
 memperbarui \textit{state} secara berkelanjutan.
-% \subsubsection{Penghitungan Unik Berbasis Pelacakan}
-% Dalam konteks pelacakan objek, terutama pada sistem CCTV, satu objek dapat muncul di banyak frame tanpa menunjukkan terjadinya pelanggaran baru. Oleh karena itu, penghitungan pelanggaran harus dilakukan berdasarkan \textit{identitas objek (ID tracking)}, bukan berdasarkan jumlah deteksi \cite{zhang2022bytetrack_eccv}.
 
-% Dengan menggunakan \textit{stateful stream processing} pada Spark, sistem dapat menyimpan daftar \textit{ID} yang telah dihitung sehingga objek yang sama tidak dihitung lebih dari satu kali. Konsep ini dapat dimodelkan sebagai:
-
-% \begin{equation}
-% \mathbb{I}_{\text{count}}(ID) =
-% \begin{cases}
-% 1, & \text{jika } ID \notin \text{State}_{t-1} \\
-% 0, & \text{jika } ID \in \text{State}_{t-1}
-% \end{cases}
-% \end{equation}
-
-% Setelah ID dihitung sekali, state diperbarui:
-% \begin{equation}
-% \text{State}_{t} \leftarrow \text{State}_{t-1} \cup \{ID\}
-% \end{equation}
-
-% Dengan demikian, Spark Structured Streaming berperan sebagai modul pengelola state, memastikan bahwa penghitungan pelanggaran:
-% \begin{enumerate}
-%     \item Tidak mengalami \textit{double counting},
-%     \item Dapat menangani objek yang terhalang sementara (occlusion),
-%     \item Tetap konsisten meskipun data diterima secara kontinu dalam skala besar.
-% \end{enumerate}
-
-% \section{Object Detection}
-% Object Detection adalah teknik dalam Computer Vision yang digunakan untuk mengidentifikasi dan menemukan objek tertentu dalam sebuah gambar atau video.
-% Tujuan utama dari object detection adalah mengembangkan model dan teknik komputasi yang mampu mengidentifikasi jenis serta menentukan posisi objek dalam sebuah gambar.
-% Secara umum, object detection dapat diklasifikasikan ke dalam dua bidang penelitian utama, yaitu general object detection dan detection application\cite{10028728}.
-% General object detection berfokus pada pengembangan metode yang dapat mendeteksi berbagai objek dalam gambar secara menyeluruh, meniru cara kerja penglihatan manusia.
-% Sementara itu, detection application lebih spesifik dalam mendeteksi objek dalam konteks tertentu, seperti identifikasi pejalan kaki, rambu lalu lintas, wajah, dan berbagai skenario lainnya \cite{10028728}.
 \subsection{YOLO (\textit{You Only Look Once})}
 \textit{You Only Look Once} (YOLO) adalah arsitektur deteksi objek berbasis
 \textit{Convolutional Neural Network} (CNN) yang memprediksi
@@ -270,61 +233,10 @@ menggunakan \textit{filter} berukuran $3 \times 3$ dan $1 \times 1$ dengan
 \textit{max pooling} untuk mereduksi dimensi spasial. Lapisan
 \textit{fully connected} menghasilkan prediksi akhir kotak pembatas dan kelas
 objek.
-% \begin{figure}[H]
-% \centering
-% \includegraphics[width=0.8\textwidth]{gambar/yolo_architure.png}
-% \caption{Arsitektur YOLO sebagai \textit{single-stage object detector}\cite{redmon2016you}.}
-% \label{fig:yolov1_architecture}
-% \end{figure}
-% \subsubsection{Paradigma Prediksi Berbasis Anchor-Free}
 
-% Pendekatan deteksi objek modern menunjukkan pergeseran konseptual dari metode \textit{anchor-based} menuju \textit{anchor-free prediction}.
-% Pada varian terdahulu seperti YOLOv3 hingga YOLOv5, sistem deteksi bergantung pada kumpulan \textit{anchor boxes} yang telah ditentukan sebelumnya untuk memperkirakan ukuran dan rasio aspek objek.
-% Meskipun efektif, mekanisme tersebut memiliki keterbatasan berupa ketergantungan pada hiperparameter dan sensitivitas terhadap variasi skala objek.
+\subsubsection{Komponen Galat YOLOv8 untuk Latihan Multikelas}
 
-% YOLOv8 mengadopsi paradigma \textit{anchor-free} untuk meningkatkan efisiensi dan generalisasi model \cite{yaseen2024yolov8indepthexplorationinternal}.
-% Dalam pendekatan ini, model tidak lagi melakukan regresi terhadap \textit{offset} dari \textit{anchor box} yang telah ditetapkan, tetapi secara langsung memprediksi parameter geometrik kotak pembatas yakni pusat, lebar, dan tinggi dalam koordinat normalisasi relatif terhadap peta fitur.
-% Perubahan ini mengurangi kompleksitas komputasi, mempercepat konvergensi pelatihan, serta meningkatkan stabilitas pada kasus deteksi objek berukuran kecil dan padat.
-% Strategi \textit{anchor-free} juga menunjukkan konsistensi hasil deteksi lintas domain tanpa memerlukan penyesuaian parameter \textit{anchor} secara manual.
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=0.65\textwidth]{gambar/yolox-shifting-to-anchor-free-design.jpg}
-%     \caption{Perbandingan pendekatan \textit{anchor-based} dan \textit{anchor-free}\cite{yaseen2024yolov8indepthexplorationinternal}.}
-%     \label{fig:anchor_free_comparison}
-% \end{figure}
-
-% \subsubsection{Arsitektur Modul C2f}
-
-% Modul C2f pada YOLOv8 merepresentasikan evolusi arsitektur dari modul \textbf{C3} yang digunakan pada YOLOv5, dengan tujuan meningkatkan efisiensi komputasi tanpa mengorbankan kemampuan representasi fitur.
-% C2f mengimplementasikan prinsip \textit{Cross-Stage Partial (CSP)} yang memisahkan aliran fitur (\textit{feature flow}) menjadi dua jalur komputasi paralel: satu jalur dilewatkan melalui blok konvolusional bertingkat, sementara jalur lainnya langsung terhubung ke tahap penggabungan (\textit{feature concatenation}).
-% Strategi ini mengurangi redundansi gradien selama propagasi balik, sehingga menurunkan jumlah parameter dan penggunaan memori secara signifikan \cite{yaseen2024yolov8indepthexplorationinternal}. Modul C3 yang hanya melakukan fusi fitur setelah proses konvolusi bertingkat, C2f memungkinkan \textit{feature fusion} terjadi secara lebih adaptif melalui koneksi parsial antar tahap, sehingga memperkaya konteks spasial yang ditangkap oleh jaringan.
-% Pendekatan ini menghasilkan representasi fitur yang lebih stabil dan padat, sekaligus mempertahankan performa deteksi pada objek kecil dan berukuran menengah.
-% Secara keseluruhan, studi perbandingan arsitektur menunjukkan bahwa C2f menawarkan peningkatan efisiensi sekitar 15–20\% dalam penggunaan memori dengan akurasi setara atau lebih baik dibandingkan modul sebelumnya \cite{selcuk2023comparison}.
-
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=0.8\textwidth]{gambar/YOLOv5-C3-Module-YOLOv8-C2f-Module-and-Darknet-Bottleneck-Module.png}
-%     \caption{Perbandingan struktur modul C3 (YOLOv5) dan C2f (YOLOv8). C2f meningkatkan efisiensi memori dengan mengoptimalkan pemrosesan jalur fitur sambil mempertahankan kedalaman representasi \cite{yaseen2024yolov8indepthexplorationinternal}.}
-%     \label{fig:c3_vs_c2f}
-% \end{figure}
-% \subsubsection{Arsitektur \textit{Decoupled Head}}
-
-% YOLOv8 memperkenalkan arsitektur \textit{Decoupled Head} sebagai perbaikan atas desain \textit{coupled head} yang digunakan pada varian sebelumnya.
-% Pada pendekatan tradisional, jalur prediksi untuk \textit{kelas}, \textit{confidence}, dan \textit{bounding box regression} dibagikan dalam satu struktur konvolusional terpadu, yang sering kali menyebabkan interferensi gradien selama proses pelatihan.
-% Fenomena ini menghambat konvergensi dan menurunkan stabilitas prediksi, khususnya pada skenario dengan kepadatan objek tinggi atau tumpang tindih antar objek.
-
-% Arsitektur \textit{Decoupled Head} memisahkan jalur prediksi menjadi tiga cabang independen yang masing-masing difokuskan pada tugas klasifikasi, estimasi kepercayaan (\textit{objectness confidence}), dan regresi kotak pembatas.
-% Setiap cabang melakukan pembelajaran terhadap representasi fitur yang terisolasi dan spesifik terhadap tujuannya \cite{yaseen2024yolov8indepthexplorationinternal}.
-% Pemisahan ini menghasilkan distribusi gradien yang lebih seimbang antar cabang prediksi, yang berdampak pada peningkatan stabilitas pelatihan dan percepatan konvergensi.
-% Hasil empiris menunjukkan bahwa struktur tersebut juga memperkuat keseimbangan antara presisi dan \textit{recall} pada evaluasi \textit{mAP}, terutama pada dataset dengan tingkat tumpang tindih objek yang tinggi.
-
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=0.65\textwidth]{gambar/The-difference-between-the-YOLO-coupled-head-and-decoupled-head.png}
-%     \caption{Perbandingan arsitektur \textit{coupled head} dan \textit{decoupled head} pada YOLOv8.
-%     Jalur regresi kotak, klasifikasi, dan estimasi kepercayaan dipisahkan untuk menghindari interferensi gradien, meningkatkan stabilitas pelatihan, serta mempercepat konvergensi model \cite{yaseen2024yolov8indepthexplorationinternal}.}
-%     \label{fig:decoupled_head_yolov8}
-% \end{figure}
+Latihan YOLOv8 untuk multikelas menggabungkan tiga komponen galat yang masing-masing menargetkan aspek prediksi yang berbeda. Komponen pertama adalah \textit{box loss}, yang mengukur jarak antara kotak pembatas hasil prediksi dan kotak rujukan. Komponen kedua adalah \textit{class loss} yang menilai kebenaran label kelas pada setiap kotak. Komponen ketiga adalah \textit{Distribution Focal Loss} (DFL) yang menjadi penanda khas YOLOv8: alih-alih meregresi nilai tunggal koordinat kotak, DFL memodelkan distribusi diskret atas posisi sub-pixel sehingga model mampu menangkap ketidakpastian koordinat secara lebih halus dan stabil pada objek kecil maupun padat \cite{yaseen2024yolov8indepthexplorationinternal}. Tiga komponen tersebut dipantau secara terpisah pada kurva latihan dan validasi---termasuk yang dilaporkan pada Bab 4---sehingga perilaku konvergensi dapat dianalisis per komponen, bukan hanya total galat.
 
 \subsection{ByteTrack: Multi-Object Tracking Berbasis Asosiasi Dua Tahap}
 
@@ -406,7 +318,7 @@ Dari perspektif performa, \textit{data mart} menyediakan jalur agregasi yang
 lebih efisien untuk kebutuhan panel Grafana karena metrik telah dipetakan pada
 skema relasional yang terarah. Struktur ini juga berfungsi sebagai lapisan
 semantik yang stabil untuk definisi indikator kinerja utama (KPI), sehingga
-istilah, rumus, dan konteks analitik tetap konsisten pada seluruh dasbor.
+istilah, rumus, dan konteks analitik tetap konsisten pada seluruh \textit{dashboard}.
 Tanpa lapisan \textit{data mart}, kueri analitik harus berulang kali
 merekonstruksi logika bisnis langsung dari aliran data mentah. Kondisi ini
 berisiko meningkatkan latensi, inkonsistensi hasil, dan kompleksitas
@@ -445,7 +357,7 @@ Grafana berperan sebagai lapisan presentasi yang menghubungkan hasil
 pemrosesan sistem analitik, seperti \textit{Apache Spark}, ke dalam
 visualisasi interaktif yang diperbarui otomatis. Aliran data dari
 \textit{streaming pipeline} diproses melalui mekanisme
-\textit{Extract--Transform--Load} (ETL) sebelum ditampilkan pada dasbor.
+\textit{Extract--Transform--Load} (ETL) sebelum ditampilkan pada \textit{dashboard}.
 Pendekatan ini mendukung paradigma \textit{real-time analytics}, sehingga
 pengguna dapat mengeksplorasi data terbaru tanpa menunggu siklus
 \textit{batch} \cite{devireddy2020realtimewarehouse}.
@@ -566,27 +478,7 @@ merupakan rata-rata AP pada beberapa ambang IoU. Formulasi mAP pada
 Pendekatan ini mencakup sepuluh ambang IoU dari 0{.}50 hingga 0{.}95 dengan
 interval 0{.}05, sehingga evaluasi tidak hanya menilai keberhasilan deteksi
 objek, tetapi juga ketepatan batas spasialnya.
-% \subsubsection{MOTA (Multi-Object Tracking Accuracy)}
-% MOTA merupakan salah satu metrik paling luas digunakan untuk mengevaluasi kinerja pelacakan karena menggambarkan akurasi pelacakan secara keseluruhan.
-% MOTA didefinisikan sebagai:
-% \begin{equation}
-% \text{MOTA} = 1 - \frac{\sum_{t} (FN_t + FP_t + IDSW_t)}{\sum_{t} GT_t}
-% \end{equation}
-% \noindent
-% dengan:
-% \begin{description}
-%     \item[$FN_t$:] jumlah objek yang tidak terdeteksi pada frame ke-$t$,
-%     \item[$FP_t$:] jumlah deteksi palsu,
-%     \item[$IDSW_t$:] jumlah \textit{ID Switch} (pergantian identitas),
-%     \item[$GT_t$:] jumlah total objek sebenarnya (ground truth).
-% \end{description}
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=0.75\textwidth]{gambar/mota.png}
-%     \caption{Ilustrasi MOTA.
-%     Gambar menunjukkan hubungan antara deteksi benar, salah, serta pergantian identitas dalam penilaian MOTA.}
-%     \label{fig:mota_milan}
-% \end{figure}
+
 \subsection{Evaluasi Sistem Streaming}
 
 Evaluasi sistem pemrosesan data \textit{real-time} berbasis arsitektur Kappa
