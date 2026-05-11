@@ -559,13 +559,13 @@ Tiga sub-bab di atas menghasilkan empat bukti yang saling melengkapi. Persistens
 \section{Implementasi \textit{Data Mart} Analitik Pelanggaran Helm}
 \label{sec:data-mart}
 
-Tahap hilir arsitektur ini mengonsolidasi aliran peristiwa (\textit{event stream}) menjadi wawasan operasional yang terukur dan dapat ditindaklanjuti. Subbab ini menguraikan tiga pilar transformasi data. Pertama, implementasi gudang penyimpanan analitik berbasis skema bintang (\textit{star schema}) pada PostgreSQL. Kedua, perancangan antarmuka dasbor interaktif (\textit{real-time dashboard}) menggunakan Grafana. Ketiga, evaluasi analitik atas rekaman operasional lapangan untuk memvalidasi peran sistem sebagai Sistem Pendukung Keputusan (\textit{Decision Support System}) dalam manajemen keselamatan kampus.
+Setelah \textit{pipeline} di sisi tepi menghasilkan \textit{event stream} pelanggaran, lapisan hilir bertugas menyimpan, menyajikan, dan menafsirkan aliran tersebut. Sub-bab ini menguraikan tiga komponen lapisan hilir: \textit{data mart} berbasis skema bintang (\textit{star schema}) pada PostgreSQL, dasbor interaktif Grafana, dan analisis wawasan lapangan atas rekaman operasional 10 jam di gerbang utama Itera. Susunan ini sekaligus memvalidasi peran sistem sebagai Sistem Pendukung Keputusan (\textit{Decision Support System}) dalam manajemen keselamatan kampus.
 % ------------------------------------------------------------
 \subsection{Implementasi \textit{Data Mart} Berbasis Skema Bintang (\textit{Star Schema})}
 \label{subsec:implementasi-star-schema}
 % ------------------------------------------------------------
 
-Penyimpanan akhir data ekstraksi CCTV dibangun pada PostgreSQL menggunakan pendekatan skema bintang (\textit{star schema}). Aliran data pelanggaran dimuat ke tabel fakta pusat (\texttt{fact\_violations}) yang terhubung langsung dengan tiga tabel dimensi: \texttt{dim\_camera}, \texttt{dim\_violation\_type}, dan \texttt{dim\_time}. Gambar~\ref{fig:stardesign} menampilkan relasi kunci tamu (\textit{foreign key}) antar-tabel yang memisahkan metrik deteksi (probabilitas dan latensi pemrosesan) dari atribut deskriptifnya. Pemisahan ini mengikuti standar pemodelan dimensional yang menstrukturkan data sebelum tahap analisis.
+Hasil akhir aliran \textit{event} pelanggaran disimpan di PostgreSQL memakai skema bintang (\textit{star schema}). Tabel fakta \texttt{fact\_violations} menampung metrik tiap kejadian, sedangkan tiga tabel dimensi \texttt{dim\_camera}, \texttt{dim\_violation\_type}, dan \texttt{dim\_time} menampung atribut deskriptif. Gambar~\ref{fig:stardesign} menampilkan relasi \textit{foreign key} antar-tabel yang memisahkan metrik deteksi --- probabilitas dan latensi pemrosesan --- dari atribut deskriptifnya. Pemisahan ini mengikuti praktik pemodelan dimensional yang lazim dipakai untuk mempercepat agregasi analitik di basis data \textit{OLAP}.
 
 % % --- EVIDENCE 1: Gambar ERD ---
 % \begin{figure}[H]
@@ -575,11 +575,11 @@ Penyimpanan akhir data ekstraksi CCTV dibangun pada PostgreSQL menggunakan pende
 % \label{fig:erd-physical}
 % \end{figure}
 
-Berbeda dengan evaluasi \textit{pipeline} pada Subbab~\ref{subsec:evaluasi-ioa-nframe} yang memakai potongan 3.001 \textit{frame}, bagian ini melaporkan eksekusi sistem pada rekaman operasional penuh. Pemuatan data (\textit{data loading}) ke \textit{data mart} dievaluasi memakai hasil ekstraksi \textit{pipeline} pemrosesan video CCTV Gerbang Utama Itera (\texttt{gate\_utama\_01}). Data terkumpul selama 10 jam operasional aktif pada hari kerja, pukul 07.00 hingga 17.00 WIB. Setelah ekstraksi dan transformasi, sistem memuat $113$ insiden pelanggaran berkendara tanpa helm secara persisten ke tabel fakta. Setiap baris terpetakan ke dimensi waktu (jam dan periode pagi, siang, sore) dan terhubung dengan dimensi kamera serta jenis pelanggaran.
+Berbeda dengan pengujian \textit{pipeline} pada Sub-bab~\ref{subsec:persistensi-filter} yang memakai potongan 3.001 \textit{frame}, bagian ini melaporkan operasi sistem pada rekaman penuh. Sumber data: kamera \texttt{gate\_utama\_01} di gerbang utama Itera, direkam selama 10 jam pada hari kerja pukul 07.00--17.00 WIB. Setelah \textit{pipeline} bekerja, \textit{data mart} menerima 113 insiden pelanggaran berkendara tanpa helm secara persisten. Tiap baris terhubung ke dimensi waktu (jam dan periode pagi, siang, sore), dimensi kamera, dan dimensi jenis pelanggaran.
 
 
 
-Pada Tabel~\ref{tab:datamart-sample}, mekanisme penggabungan (\textit{join}) relasional berjalan sesuai rancangan arsitektur. Seluruh atribut kontekstual terekam tanpa anomali struktural, termasuk 12 rekaman yang memuat tautan bukti tangkapan layar (\textit{evidence image}). Pemuatan ini memperlihatkan \textit{pipeline} pendataan berhasil mentransformasi aliran data mentah (\textit{raw data}) berbasis video menjadi format basis data multidimensi. Validitas pemuatan tersebut menyiapkan \textit{star schema} sebagai fondasi agregasi dan kueri analitik lalu lintas pada tahap selanjutnya.
+Tabel~\ref{tab:datamart-sample} memperlihatkan contoh tiga baris hasil \textit{join} \texttt{fact\_violations} dengan ketiga tabel dimensi. Setiap baris menggabungkan waktu kejadian, lokasi sensor, jenis pelanggaran, probabilitas deteksi, dan latensi pemrosesan dalam satu tampilan kueri. Dari 113 insiden yang termuat, 12 di antaranya membawa tautan ke berkas gambar bukti sehingga rekaman pelanggaran dapat diaudit ulang. Dengan susunan ini, \textit{data mart} sudah siap dipakai untuk agregasi dan kueri analitik di sub-bab berikutnya.
 % --- EVIDENCE 2: Tabel Sampel Data ---
 \begin{table}[htbp]
 \centering
