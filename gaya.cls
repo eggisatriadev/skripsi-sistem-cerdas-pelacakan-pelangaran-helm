@@ -121,7 +121,7 @@
 \usepackage[shortlabels]{enumitem}
 \setlist{nosep}
 
-%Tautan dan Daftar Isi
+%Tautan dan DAFTAR ISI
 \usepackage[hypertexnames=false]{hyperref}
 \newlength{\mylenf}
 \settowidth{\mylenf}{\cftfigpresnum}
@@ -568,7 +568,7 @@ Yang menyatakan\\
 
 
 %------------------------------------------------------------
-%Daftar Singkatan
+%DAFTAR SINGKATAN
 %------------------------------------------------------------
 \def\singkatan{%
   \chapter*{\nomenclaturename}%
@@ -577,7 +577,7 @@ Yang menyatakan\\
 }
 
 %------------------------------------------------------------
-%Daftar Simbol
+%DAFTAR SIMBOL
 %------------------------------------------------------------
 \def\simbol{%
   \chapter*{\symbolname}%
