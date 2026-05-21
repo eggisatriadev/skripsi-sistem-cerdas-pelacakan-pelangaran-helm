@@ -254,7 +254,7 @@ Tahap ini membangun pipeline streaming terdistribusi untuk mengubah deteksi ment
 \subsection{Tahap 4: Implementasi Data Mart dan Visualisasi}
 Tahap terakhir mengonsolidasikan data operasional ke \textit{data mart} analitik dan mengevaluasi fungsionalitas akhir sistem.
 \begin{enumerate}[a.]
-\item {Pemuatan data ke skema bintang}: data dimuat ke PostgreSQL dengan desain \textit{star schema}. Skema ini memisahkan tabel fakta (\texttt{fact\_violations}) dan tabel dimensi (\texttt{dim\_camera}, \texttt{dim\_time}, \texttt{dim\_violation\_type}) untuk mempercepat kueri agregasi.
+\item {Pemuatan data ke skema bintang}: data dimuat ke PostgreSQL dengan desain \textit{star schema}. Skema ini memisahkan tabel fakta (\texttt{fact\_violations}) dan tabel dimensi (\texttt{dim\_camera}, \texttt{dim\_date}, \texttt{dim\_violation\_type}) untuk mempercepat kueri agregasi.
 \item {Visualisasi \textit{dashboard} analitik}: antarmuka pemantauan dibangun di Grafana yang terhubung langsung ke \textit{data mart} untuk menyajikan metrik operasional secara interaktif.
 \end{enumerate}
 

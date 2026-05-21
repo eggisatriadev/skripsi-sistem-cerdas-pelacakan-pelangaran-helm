@@ -17,7 +17,7 @@
 \textbf{Kolom} & \textbf{Tipe Data} & \textbf{Deskripsi} \\
 \midrule
 \textit{violation\_id} & BIGINT (PK) & Kunci primer unik untuk setiap event pelanggaran. \\
-\textit{timestamp\_fk} & BIGINT (FK) & Kunci asing ke \textit{dim\_time}. \\
+\textit{date\_fk} & INT (FK) & Kunci asing ke \textit{dim\_date} yang menyimpan konteks tanggal kejadian. \\
 \textit{camera\_fk} & INT (FK) & Kunci asing ke \textit{dim\_camera}. \\
 \textit{violation\_type\_fk} & INT (FK) & Kunci asing ke \textit{dim\_violation\_type}. \\
 \textit{track\_id} & VARCHAR(50) & ID unik objek yang dilacak (dari sistem deteksi). \\
@@ -37,7 +37,7 @@
 \toprule
 \textbf{Tabel} & \textbf{Kunci Utama} & \textbf{Relasi terhadap \textit{fact\_violations}} \\
 \midrule
-\texttt{dim\_time} & \texttt{timestamp\_pk} & Direlasikan melalui \texttt{timestamp\_fk} untuk menyediakan konteks waktu kejadian. \\
+\texttt{dim\_date} & \texttt{date\_pk} & Direlasikan melalui \texttt{date\_fk} untuk menyediakan konteks tanggal kejadian (hari, bulan, tahun, akhir pekan, masa ujian). \\
 \texttt{dim\_camera} & \texttt{camera\_pk} & Direlasikan melalui \texttt{camera\_fk} untuk menyediakan konteks sumber kamera dan lokasi pemantauan. \\
 \texttt{dim\_violation\_type} & \texttt{type\_pk} & Direlasikan melalui \texttt{violation\_type\_fk} untuk menyediakan konteks jenis pelanggaran yang terdeteksi. \\
 \bottomrule
@@ -46,17 +46,15 @@
 
 \begin{table}[H]
 \centering
-\caption{Tabel Dimensi \textit{dim\_time}}
-\label{tab:dim_time}
+\caption{Tabel Dimensi \textit{dim\_date}}
+\label{tab:dim_date}
 \small\setlength{\tabcolsep}{4pt}\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.20\textwidth}>{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Kolom} & \textbf{Tipe Data} & \textbf{Deskripsi} \\
 \midrule
-\textit{timestamp\_pk} & BIGINT (PK) & Kunci primer unik untuk dimensi waktu. \\
-\textit{datetime\_full} & TIMESTAMP & Timestamp lengkap (YYYY-MM-DD HH:MI:SS). \\
-\textit{hour\_of\_day} & SMALLINT & Jam dalam sehari (0--23). \\
+\textit{date\_pk} & INT (PK) & Kunci primer unik untuk dimensi tanggal. \\
+\textit{date} & DATE & Tanggal kalender (granularitas baris). \\
 \textit{day\_of\_week} & VARCHAR(10) & Nama hari (Senin, Selasa, ...). \\
-\textit{date} & DATE & Tanggal. \\
 \textit{month} & SMALLINT & Bulan dalam setahun (1--12). \\
 \textit{year} & SMALLINT & Tahun. \\
 \textit{is\_weekend} & BOOLEAN & Penanda (True/False) jika akhir pekan. \\
