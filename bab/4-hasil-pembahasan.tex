@@ -557,8 +557,7 @@ Batch 2--7 & \textit{Empty / Idle} & 0 baris & 0 ms & 0 baris/detik \\
 \end{tabularx}
 \end{table}
 
-% 
-\section{\textit{Data Mart} dan Visualisasi Analitik}
+% \section{\textit{Data Mart} dan Visualisasi Analitik}
 \label{sec:data-mart}
 
 Subbab ini menguraikan tiga pilar transformasi data. Pertama, implementasi gudang penyimpanan analitik berbasis skema bintang (\textit{star schema}) pada PostgreSQL. Kedua, perancangan antarmuka dasbor interaktif (\textit{real-time dashboard}) menggunakan Grafana. Ketiga, evaluasi analitik atas rekaman operasional lapangan untuk memvalidasi peran sistem sebagai Sistem Pendukung Keputusan (\textit{Decision Support System}) dalam manajemen keselamatan kampus.
@@ -568,19 +567,11 @@ Subbab ini menguraikan tiga pilar transformasi data. Pertama, implementasi gudan
 \label{subsec:implementasi-star-schema}
 % 
 
-Hasil akhir aliran \textit{event} pelanggaran disimpan di PostgreSQL memakai skema bintang (\textit{star schema}), salah satu pola pemodelan dimensional yang paling banyak dipakai pada gudang data analitik~\cite{kimball2013dwtoolkit}. Pola ini menempatkan satu tabel fakta sebagai pusat dan mengelilinginya dengan beberapa tabel dimensi yang terhubung melalui \textit{foreign key}---bentuk yang dari atas terlihat seperti titik-titik bintang menyebar dari sebuah inti. Pada penelitian ini, peran inti dipegang oleh \texttt{fact\_violations} yang menampung metrik kuantitatif tiap kejadian, sedangkan tiga titik bintangnya adalah \texttt{dim\_camera}, \texttt{dim\_violation\_type}, dan \texttt{dim\_time} yang menampung atribut deskriptif kontekstual. Gambar~\ref{fig:stardesign} menampilkan relasi \textit{foreign key} antar-tabel sekaligus arah kardinalitasnya: tiap baris fakta menunjuk tepat satu baris pada setiap dimensi, sementara tiap baris dimensi dapat menjadi rujukan banyak baris fakta. Pemisahan metrik dari atribut deskriptif ini mengikuti praktik pemodelan dimensional yang dirancang untuk mempercepat agregasi analitik di basis data \textit{OLAP}, berbeda dengan rancangan ternormalisasi pada basis data transaksional yang dioptimalkan untuk operasi tulis.
+Berbeda dengan pengujian \textit{pipeline} pada Sub-bab~\ref{subsec:persistensi-filter} yang memakai potongan 3.001 \textit{frame}, bagian ini melaporkan operasi sistem pada rekaman penuh. Sumber data berasal dari kamera \texttt{gate\_utama\_01} di gerbang utama Itera, direkam selama 10 jam pada hari kerja pukul 07.00--17.00 WIB. Pada rentang waktu tersebut, \textit{pipeline} memproses 11.172 deteksi mentah dari ketiga kelas dan menyalurkannya lewat rangkaian filter spasial-temporal yang sama dengan pengujian sebelumnya. Setelah seleksi kelas, filter IoA, konfirmasi N-\textit{frame}, dan \textit{dedup} per-\textit{track} berjalan, \textit{data mart} menerima 113 insiden pelanggaran berkendara tanpa helm secara persisten. Tiap baris terhubung ke dimensi waktu, dimensi kamera, dan dimensi jenis pelanggaran.
 
-Inti rancangan ini berlabuh pada konsep \textit{grain}, yaitu makna satu baris pada tabel fakta. Satu baris \texttt{fact\_violations} merepresentasikan satu insiden pelanggaran tervalidasi setelah seluruh filter spasial--temporal pada Sub-bab~\ref{subsec:persistensi-filter} berjalan, bukan satu deteksi mentah per \textit{frame}. Definisi \textit{grain} yang ketat tersebut menjaga tafsir agregasi tetap konsisten: \texttt{COUNT(*)} pada tabel fakta selalu berarti jumlah pelanggaran, bukan jumlah \textit{bounding box}. Kolom yang melekat di tabel fakta dibatasi pada \textit{surrogate key}, tiga \textit{foreign key} ke dimensi (\texttt{camera\_id}, \texttt{violation\_type\_id}, \texttt{time\_id}), serta dua \textit{measure}: probabilitas deteksi dan latensi pemrosesan. Probabilitas bersifat \textit{semi-additive} sehingga lebih lazim diagregasikan dengan \texttt{AVG}, \texttt{MIN}, atau \texttt{MAX} daripada \texttt{SUM}, sedangkan latensi---sebagai durasi---dapat dijumlahkan untuk memperoleh total waktu pemrosesan pada periode tertentu. Atribut deskriptif sengaja diusir ke tabel dimensi sehingga tabel fakta tumbuh memanjang (baris) tanpa melebar (kolom), pola pertumbuhan yang efisien untuk volume rekaman jangka panjang.
+Tabel~\ref{tab:datamart-sample} menyajikan contoh tiga baris hasil \textit{join} \texttt{fact\_violations} dengan tabel dimensi. Setiap baris menggabungkan waktu kejadian, lokasi sensor, jenis pelanggaran, probabilitas deteksi, dan latensi pemrosesan dalam satu tampilan kueri. Baris pertama tercatat pada periode pagi dengan probabilitas 85,2\% dan latensi 45,2 milidetik. Baris kedua bergeser ke periode sore dengan probabilitas 65,4\% dan latensi 92,5 milidetik. Baris ketiga kembali ke profil lebih stabil dengan probabilitas 82,3\% dan latensi 41,0 milidetik. Contoh ini memperlihatkan bahwa struktur skema bintang tidak hanya menghasilkan total pelanggaran, tetapi juga mendukung pembacaan hubungan antara waktu, lokasi, kualitas deteksi, dan beban pemrosesan.
 
-Tiga tabel dimensi bekerja sebagai pengaya konteks tabel fakta dengan pembagian peran yang tegas, dan masing-masing terhubung dalam relasi \textit{many-to-one} ke \texttt{fact\_violations}. Dimensi \texttt{dim\_camera} memuat identitas dan lokasi geospasial sensor, sehingga setiap insiden dapat dirunut ke titik pengamatan tertentu tanpa menyimpan kolom lokasi yang sama berulang di tabel fakta. Dimensi \texttt{dim\_violation\_type} menampung kode dan deskripsi jenis pelanggaran; struktur ini disiapkan untuk perluasan ke pelanggaran lain---seperti berbonceng tiga atau penggunaan ponsel saat berkendara---tanpa perubahan struktur tabel fakta, cukup dengan menambah baris di dimensi. Dimensi \texttt{dim\_time} merinci atribut tanggal, jam, kuartal 15 menit, dan periode (pagi, siang, sore) yang menjadi fondasi seluruh agregasi temporal pada \textit{dashboard}; tanpa dimensi waktu yang kaya, panel \textit{time-series} terpaksa mengandalkan fungsi \texttt{EXTRACT} berulang yang memberatkan kueri agregasi. Ketiga dimensi sengaja dibuat lebar (\textit{wide})---atribut turunan seperti ``periode harian'' disimpan eksplisit daripada dihitung saat kueri---supaya beban komputasi berpindah ke fase \textit{load}, bukan ke fase \textit{read} yang lebih sering terjadi.
-
-Skema bintang dipilih ketimbang skema kepingan salju (\textit{snowflake}) maupun tabel tunggal terdenormalisasi karena tiga alasan praktis. Pertama, kueri analitik di Grafana mengandalkan SQL standar dengan satu \textit{level join} antara fakta dan tiap dimensi, sehingga panel \textit{time-series} dapat dibangun tanpa CTE bertingkat atau sub-kueri rekursif. Kedua, denormalisasi pada level dimensi membuat atribut deskriptif (misalnya periode harian dan kode pelanggaran) terbaca tanpa biaya kueri tambahan; pendekatan ini secara sadar menukar sedikit redundansi penyimpanan dengan kecepatan baca, sesuai prinsip optimasi gudang data analitik. Ketiga, ekspansi ke jenis pelanggaran lain atau kamera tambahan hanya memerlukan baris baru di dimensi, bukan perubahan struktur tabel fakta, sehingga skema cukup tahan terhadap perubahan lingkup penelitian. Pertimbangan ini sejalan dengan rekomendasi Kimball pada konteks \textit{data mart} bertujuan tunggal: tabel fakta yang ringkas dengan \textit{grain} yang tegas, dimensi yang lebar dan deskriptif, serta relasi yang dangkal untuk memudahkan pembacaan oleh perangkat visualisasi~\cite{kimball2013dwtoolkit}.
-
-Berbeda dengan pengujian \textit{pipeline} pada Sub-bab~\ref{subsec:persistensi-filter} yang memakai potongan 3.001 \textit{frame}, bagian ini melaporkan operasi sistem pada rekaman penuh. Sumber data berasal dari kamera \texttt{gate\_utama\_01} di gerbang utama Itera, direkam selama 10 jam pada hari kerja pukul 07.00--17.00 WIB. Pada rentang waktu tersebut, \textit{pipeline} memproses 11.172 deteksi mentah dari ketiga kelas dan menyalurkannya lewat rangkaian filter spasial-temporal yang sama dengan pengujian sebelumnya. Setelah seleksi kelas, filter IoA, konfirmasi N-\textit{frame}, dan \textit{dedup} per-\textit{track} berjalan, \textit{data mart} menerima 113 insiden pelanggaran berkendara tanpa helm secara persisten. Tiap baris terhubung ke dimensi waktu (jam dan periode pagi, siang, sore), dimensi kamera, dan dimensi jenis pelanggaran.
-
-Tabel~\ref{tab:datamart-sample} menyajikan contoh tiga baris hasil \textit{join} \texttt{fact\_violations} dengan ketiga tabel dimensi. Setiap baris menggabungkan waktu kejadian, lokasi sensor, jenis pelanggaran, probabilitas deteksi, dan latensi pemrosesan dalam satu tampilan kueri. Baris pertama (08.15.22 WIB) tercatat pada periode pagi dengan probabilitas 85,2\% dan latensi 45,2 milidetik, profil khas saat arus kendaraan masih ringan dan kondisi cahaya merata. Baris kedua (14.50.33 WIB) bergeser ke periode sore dengan probabilitas turun ke 65,4\% dan latensi naik ke 92,5 milidetik, sejalan dengan kepadatan pasca-hujan dan jadwal pergantian kelas yang menaikkan beban inferensi. Baris ketiga (16.50.45 WIB) kembali ke profil tenang dengan probabilitas 82,3\% dan latensi 41,0 milidetik di pengujung hari operasional. Pola ringkas ini sudah memperlihatkan hubungan beban--keyakinan--latensi yang dibahas lebih jauh pada Sub-bab~\ref{subsubsec:analisis-stabilitas-ai}.
-
-Dari 113 insiden yang termuat, 12 di antaranya membawa tautan ke berkas gambar bukti sehingga rekaman pelanggaran dapat diaudit ulang oleh operator gerbang. Struktur ini juga mendukung kueri \textit{OLAP} yang lazim: agregasi \texttt{COUNT(*)} per jam, \texttt{AVG(confidence)} per periode harian, dan tabulasi silang antara dimensi waktu dan dimensi jenis pelanggaran. Dengan susunan tersebut, \textit{data mart} sudah siap dipakai untuk agregasi dan kueri analitik yang menggerakkan panel \textit{dashboard} pada sub-bab berikutnya.
+Dari 113 insiden yang termuat, 12 di antaranya membawa tautan ke berkas gambar bukti sehingga rekaman pelanggaran dapat diaudit ulang oleh operator gerbang. Struktur ini mendukung kueri OLAP yang lazim, seperti total pelanggaran per jam, rata-rata \textit{confidence} per periode harian, distribusi kamera, dan tabulasi silang antara jam dan hari. Dengan susunan tersebut, \textit{data mart} memenuhi fungsi ganda: mempertahankan detail kejadian untuk audit dan menyediakan agregasi yang siap dikonsumsi oleh panel \textit{dashboard}.
 
 %  EVIDENCE 2: Tabel Sampel Data 
 \begin{table}[htbp]
@@ -601,10 +592,73 @@ Dari 113 insiden yang termuat, 12 di antaranya membawa tautan ke berkas gambar b
 \end{tabularx}
 \renewcommand{\arraystretch}{1.0}
 \end{table}
+
+Implementasi \textit{data mart} pada penelitian ini dibangun menggunakan skema bintang (\textit{star schema}) karena pola tersebut memisahkan data kuantitatif pada tabel fakta dan atribut deskriptif pada tabel dimensi. Dalam pendekatan Kimball, perancangan dimensional dimulai dari penentuan proses bisnis, deklarasi \textit{grain}, pemilihan dimensi, kemudian penetapan fakta atau \textit{measure} yang konsisten dengan \textit{grain} tersebut~\cite{kimball2013dwtoolkit,kimball_grain}. Proses bisnis yang dimodelkan pada penelitian ini adalah pencatatan kejadian pelanggaran helm yang telah lolos deteksi YOLOv8, pelacakan ByteTrack, filter spasial, dan validasi temporal. Oleh karena itu, tabel \texttt{fact\_violations} ditempatkan sebagai pusat skema, sedangkan \texttt{dim\_camera}, \texttt{dim\_violation\_type}, dan \texttt{dim\_time} digunakan sebagai konteks analitik. Susunan ini membuat kueri analitik dapat menjumlahkan metrik pelanggaran berdasarkan waktu, lokasi kamera, dan tipe pelanggaran tanpa harus membaca ulang struktur data operasional dari sistem deteksi.
+
+\subsubsection{Penetapan \textit{grain} tabel fakta}
+
+\textit{Grain} adalah keputusan paling penting dalam rancangan skema bintang karena menjelaskan makna satu baris pada tabel fakta. Kimball menekankan bahwa deklarasi \textit{grain} menjadi kontrak desain: setiap dimensi dan fakta yang dimasukkan harus konsisten dengan makna satu baris tersebut~\cite{kimball_grain}. Pada sistem ini, \textit{grain} \texttt{fact\_violations} ditetapkan sebagai berikut.
+
+\begin{quote}
+\textit{Satu baris pada \texttt{fact\_violations} merepresentasikan satu kejadian pelanggaran helm yang telah tervalidasi pada satu kamera, satu waktu kejadian, satu objek pelacakan, dan satu tipe pelanggaran.}
+\end{quote}
+
+Deklarasi tersebut membedakan data mart dari log deteksi mentah per \textit{frame}. Pada tahap hulu, satu pengendara yang melintas dapat terdeteksi berulang selama beberapa \textit{frame}. Jika semua deteksi mentah langsung dimasukkan ke \textit{data mart}, angka yang muncul pada \textit{dashboard} akan merepresentasikan jumlah \textit{bounding box} atau jumlah \textit{frame}, bukan jumlah pelanggaran. Oleh karena itu, filter spasial--temporal dan mekanisme \textit{deduplication} berdasarkan \texttt{track\_id} dilakukan sebelum data masuk ke tabel fakta. Hasilnya, fungsi agregasi seperti \texttt{COUNT(*)} atau \texttt{SUM(violation\_count)} memiliki makna bisnis yang stabil, yaitu jumlah kejadian pelanggaran.
+
+Pemilihan \textit{grain} per-kejadian juga sesuai dengan konsep \textit{transaction fact table}. Kimball menjelaskan bahwa satu baris pada \textit{transaction fact table} berhubungan dengan satu peristiwa pengukuran pada titik ruang dan waktu tertentu; tabel ini bersifat ekspresif karena memungkinkan analisis rinci dan agregasi ulang ke berbagai sudut pandang~\cite{kimball_transaction_fact}. Untuk data CCTV, karakter ini penting karena setiap kejadian masih perlu ditelusuri kembali melalui \texttt{event\_id}, \texttt{track\_id}, waktu kejadian, \textit{confidence}, \textit{bounding box}, latensi, dan tautan gambar bukti. Dengan demikian, penyimpanan atomik per-kejadian tidak bertentangan dengan kebutuhan OLAP. Data atomik dipertahankan sebagai sumber kebenaran, sedangkan ringkasan per-jam dibuat melalui \textit{view} atau tabel agregat untuk mempercepat visualisasi.
+
+\subsubsection{Struktur skema bintang dan peran tabel}
+
+Gambar~\ref{fig:stardesign} memperlihatkan bentuk skema bintang yang digunakan. Tabel \texttt{fact\_violations} berisi \textit{foreign key} menuju tiga dimensi utama, yaitu \texttt{timestamp\_fk}, \texttt{camera\_fk}, dan \texttt{violation\_type\_fk}. Selain itu, tabel fakta menyimpan identitas kejadian seperti \texttt{event\_id} dan \texttt{track\_id}, atribut bukti seperti koordinat \textit{bounding box} dan \texttt{evidence\_image\_url}, serta metrik analitik seperti \texttt{violation\_count}, \texttt{confidence}, dan \texttt{processing\_latency\_ms}. Pemisahan ini membuat tabel fakta tetap berorientasi pada kejadian dan pengukuran, sementara atribut deskriptif yang dipakai untuk penyaringan atau pengelompokan ditempatkan pada tabel dimensi.
+
+Dimensi \texttt{dim\_camera} menyimpan konteks sensor, yaitu kode kamera, nama kamera, deskripsi lokasi, koordinat GPS, dan status kamera. Dimensi ini memungkinkan analisis distribusi pelanggaran berdasarkan titik pengamatan tanpa menggandakan data lokasi pada setiap baris fakta. Dimensi \texttt{dim\_violation\_type} menyimpan kode, nama, deskripsi, dan tingkat keparahan pelanggaran. Walaupun penelitian ini berfokus pada pelanggaran tanpa helm, struktur tersebut membuat sistem dapat diperluas ke tipe pelanggaran lain dengan menambah baris dimensi, bukan mengubah struktur tabel fakta. Dimensi \texttt{dim\_time} menyimpan atribut waktu seperti tanggal, tahun, bulan, hari, jam, periode harian, akhir pekan, dan periode ujian. Atribut temporal yang sering dibaca oleh \textit{dashboard}, seperti \texttt{date}, \texttt{hour}, \texttt{minute}, \texttt{day\_of\_week}, dan \texttt{time\_period}, juga disalin ke tabel fakta sebagai bentuk denormalisasi terbatas untuk mempercepat kueri operasional.
+
+Denormalisasi temporal tersebut merupakan keputusan praktis. Secara konseptual, dimensi waktu sebaiknya tidak dibiarkan membesar tanpa kendali sampai setiap milidetik menjadi baris dimensi. Pada pengembangan berikutnya, rancangan waktu dapat diperhalus menjadi \texttt{dim\_date} dengan \textit{grain} satu tanggal, \texttt{dim\_time\_of\_day} dengan \textit{grain} satu menit atau satu detik dalam sehari, serta \texttt{event\_timestamp} yang tetap disimpan pada tabel fakta untuk audit. Namun, pada implementasi ini, atribut waktu yang sudah diturunkan di tahap ETL membantu \textit{dashboard} memperoleh tren per-jam dan periode harian tanpa menjalankan fungsi ekstraksi waktu secara berulang pada setiap penyegaran panel.
+
+\subsubsection{Klasifikasi \textit{measure} pada tabel fakta}
+
+Menurut Kimball, fakta numerik pada tabel fakta dapat diklasifikasikan menjadi \textit{additive}, \textit{semi-additive}, dan \textit{non-additive facts}~\cite{kimball_additive_facts}. Klasifikasi ini penting karena menentukan fungsi agregasi yang benar. Tabel~\ref{tab:klasifikasi-measure-dw} merangkum jenis \textit{measure} yang digunakan pada \texttt{fact\_violations}.
+
+\begin{table}[htbp]
+\centering
+\caption{Klasifikasi \textit{measure} pada \texttt{fact\_violations}.}
+\label{tab:klasifikasi-measure-dw}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{3.1cm} >{\RaggedRight\arraybackslash}p{3.0cm} >{\RaggedRight\arraybackslash}X}
+\toprule
+\textbf{Kolom} & \textbf{Jenis} & \textbf{Alasan} \\
+\midrule
+\texttt{violation\_count} & \textit{Additive measure} & Bernilai 1 untuk setiap kejadian pelanggaran, sehingga dapat dijumlahkan berdasarkan seluruh dimensi. \\
+\texttt{confidence} & \textit{Non-additive / averageable measure} & Nilai keyakinan model tidak bermakna jika dijumlahkan. Nilai ini digunakan untuk membaca kualitas deteksi. \\
+\texttt{processing\_latency\_ms} & \textit{Non-additive / averageable measure} & Latensi per kejadian lebih informatif sebagai rata-rata, batas minimum, atau batas maksimum; total latensi tidak menjadi indikator operasional utama. \\
+\texttt{frame\_number} & Atribut teknis & Nomor \textit{frame} berguna untuk audit video, tetapi bukan metrik bisnis yang dijumlahkan. \\
+\texttt{bbox\_x1}--\texttt{bbox\_y2} & Atribut bukti & Koordinat \textit{bounding box} berguna untuk menelusuri lokasi objek pada citra, bukan untuk agregasi OLAP. \\
+\bottomrule
+\end{tabularx}
+\renewcommand{\arraystretch}{1.0}
+\end{table}
+
+Berdasarkan Tabel~\ref{tab:klasifikasi-measure-dw}, \texttt{violation\_count} merupakan \textit{measure} utama yang bersifat \textit{fully additive}. Karena \textit{grain} tabel fakta adalah satu kejadian pelanggaran, nilai \texttt{violation\_count} diisi 1 pada setiap baris. Total pelanggaran kemudian diperoleh dengan menjumlahkan kolom tersebut berdasarkan dimensi waktu, kamera, atau tipe pelanggaran. Secara matematis, \texttt{SUM(violation\_count)} akan setara dengan \texttt{COUNT(*)} selama satu baris fakta tetap merepresentasikan satu kejadian. Akan tetapi, penggunaan \texttt{violation\_count} tetap dipertahankan karena lebih eksplisit sebagai metrik bisnis dan memudahkan pembentukan tabel agregat.
+
+Sebaliknya, \texttt{confidence} dan \texttt{processing\_latency\_ms} tidak diperlakukan sebagai \textit{additive measure}. Penjumlahan nilai \textit{confidence} tidak memiliki makna analitik karena angka tersebut merepresentasikan tingkat keyakinan model pada satu kejadian. Oleh karena itu, kueri \textit{dashboard} menggunakan rata-rata, nilai minimum, dan nilai maksimum untuk menilai stabilitas model. Prinsip yang sama berlaku pada latensi: rata-rata latensi menunjukkan beban komputasi normal, sedangkan nilai maksimum dapat menandai lonjakan beban atau keterlambatan pemrosesan.
+
+
+\subsubsection{Evaluasi Kinerja \textit{Query} \textit{Data Mart}}
+\label{subsubsec:evaluasi-kinerja-dwh}
+
+
+\subsubsubsection{Evaluasi Ukuran Data dan Index}
+
+
+\subsubsubsection{Evaluasi Kinerja Query Dashboard}
+
+
 \subsection{Visualisasi \textit{Dashboard} Analitik}
 \label{subsec:visualisasi-dashboard}
 
-Lapisan presentasi diwujudkan sebagai \textit{dashboard} interaktif berbasis Grafana yang terhubung langsung ke \texttt{fact\_violations}. Grafana dipilih dengan tiga alasan praktis: bersifat \textit{open source} sehingga tidak menambah beban lisensi, ringan dipasang di server kampus dengan kebutuhan sumber daya yang sederhana, dan mendukung penyegaran data tiap beberapa detik tanpa konfigurasi tambahan. Tampilan utama \textit{dashboard} pada Gambar~\ref{fig:grafana-kpi-overview} membagi panel ke dalam empat kategori sesuai kebutuhan pengawasan, yaitu indikator cepat, tren waktu, performa sistem AI, dan distribusi spasio-temporal. Empat KPI ringkas di area teratas Total Pelanggaran, Jam Paling Ramai, Periode Tersibuk, dan rata-rata jeda waktu antar-pelanggaran memberikan gambaran satu pandang sebelum operator menelusuri panel detail di bawahnya.
+Lapisan presentasi diwujudkan sebagai \textit{dashboard} interaktif berbasis Grafana yang membaca \textit{view} analitik dan tabel \texttt{fact\_violations} sebagai sumber data utama. Grafana dipilih dengan tiga alasan praktis: bersifat \textit{open source} sehingga tidak menambah beban lisensi, ringan dipasang di server kampus dengan kebutuhan sumber daya yang sederhana, dan mendukung penyegaran data tiap beberapa detik tanpa konfigurasi tambahan. Tampilan utama \textit{dashboard} pada Gambar~\ref{fig:grafana-kpi-overview} membagi panel ke dalam empat kategori sesuai kebutuhan pengawasan, yaitu indikator cepat, tren waktu, performa sistem AI, dan distribusi spasio-temporal. Empat KPI ringkas di area teratas Total Pelanggaran, Jam Paling Ramai, Periode Tersibuk, dan rata-rata jeda waktu antar-pelanggaran memberikan gambaran satu pandang sebelum operator menelusuri panel detail di bawahnya.
 
 % --- EVIDENCE 1: Screenshot Grafana Overview ---
 \begin{figure}[H]
@@ -613,46 +667,6 @@ Lapisan presentasi diwujudkan sebagai \textit{dashboard} interaktif berbasis Gra
 \caption{Antarmuka utama \textit{dashboard} Grafana untuk data operasional 10 jam: KPI ringkas dan dinamika pelanggaran per 15 menit.}
 \label{fig:grafana-kpi-overview}
 \end{figure}
-
-% Empat kategori panel disusun supaya operator dapat membaca \textit{dashboard} dari yang paling ringkas ke yang paling rinci. Kategori KPI berada paling atas untuk memberi ringkasan satu pandang, kategori tren waktu mengikuti agar perubahan harian terlihat, kategori performa AI menempati posisi tengah untuk memantau kesehatan model, dan kategori distribusi spasio-temporal di bawah memberi peta panas serta peringkat lokasi rawan. Rincian fungsi tiap kategori ada pada Tabel~\ref{tab:dashboard-panels}.
-
-% Tabel~\ref{tab:dashboard-panels} merangkum peran tiap kategori panel. Kategori \textit{Indikator Kinerja Utama} menempati area paling atas \textit{dashboard} sebagai jendela cepat yang memuat empat metrik agregat dari \texttt{fact\_violations} sekaligus. Kategori \textit{Analisis Dinamika dan Tren Waktu} kemudian membuka detail temporal melalui grafik garis 15 menit, diagram batang akumulasi harian, dan komposisi periode harian. Kategori \textit{Evaluasi Performa Sistem dan AI} memantau dua metrik teknis---probabilitas deteksi dan latensi pemrosesan---yang menjaga kesehatan model di tengah variasi beban. Kategori \textit{Analisis Spasial dan Distribusi Temporal} merangkai matriks peta panas dan peringkat jam tersibuk yang menjawab pertanyaan ``kapan dan di mana pelanggaran paling sering terjadi''. Susunan keempat kategori ini sejalan dengan praktik \textit{drill-down} pada \textit{dashboard} operasional yang mengurutkan informasi dari yang paling agregat ke yang paling rinci.
-
-% Pengujian antarmuka mencatat setiap pembaruan di \texttt{fact\_violations} muncul di panel Grafana dalam beberapa detik. Dengan sinkronisasi yang konsisten, \textit{dashboard} siap dipakai operator gerbang untuk pemantauan harian. Pembacaan pola temporal dan spasial atas data \textit{dashboard} disajikan pada Sub-bab~\ref{subsec:analisis-data-lapangan}.
-
-% Empat kategori panel disusun supaya operator dapat membaca \textit{dashboard} dari yang paling ringkas ke yang paling rinci. Kategori KPI berada paling atas untuk memberi ringkasan satu pandang, kategori tren waktu mengikuti agar perubahan harian terlihat, kategori performa AI menempati posisi tengah untuk memantau kesehatan model, dan kategori distribusi spasio-temporal di bawah memberi peta panas serta peringkat lokasi rawan. Rincian fungsi tiap kategori ada pada Tabel~\ref{tab:dashboard-panels}.
-
-
-% Pengujian antarmuka mencatat setiap pembaruan di \texttt{fact\_violations} muncul di panel Grafana dalam beberapa detik. Dengan sinkronisasi yang konsisten, \textit{dashboard} siap dipakai operator gerbang untuk pemantauan harian. Pembacaan pola temporal dan spasial atas data \textit{dashboard} disajikan pada Sub-bab~\ref{subsec:analisis-data-lapangan}.
-
-% %  EVIDENCE 2: Tabel Konfigurasi Panel 
-% \begin{table}[htbp]
-% \centering
-% \caption{Kategori panel pada \textit{dashboard} analitik dan fungsinya.}
-% \label{tab:dashboard-panels}
-% \footnotesize
-% \setlength{\tabcolsep}{3pt}
-% \renewcommand{\arraystretch}{1.1}
-% \begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{4cm} >{\RaggedRight\arraybackslash}X}
-% \toprule
-% \textbf{Kategori Panel} & \textbf{Fungsi} \\
-% \midrule
-% \textit{Indikator Kinerja Utama (KPI)} & Menyajikan ringkasan indikator secara cepat (\textit{single stat}) di area teratas, meliputi metrik Total Pelanggaran, Jam Paling Ramai, Periode Tersibuk, dan Rata-rata jeda waktu antar-pelanggaran. \\
-% \textit{Analisis Dinamika dan Tren Waktu} & Menganalisis fluktuasi \textit{time-series} melalui grafik garis per 15 menit, diagram batang akumulasi pelanggaran sepanjang hari (per jam vs kumulatif), dan komposisi waktu (Pagi/Siang/Sore). \\
-% \textit{Evaluasi Performa Sistem dan AI} & Merangkum kestabilan infrastruktur melalui grafik distribusi tingkat keyakinan AI (\textit{confidence level}) dan kecepatan deteksi (\textit{system latency}) saat dihadapkan pada variasi beban data. \\
-% \textit{Analisis Spasial dan Distribusi Temporal} & Memvisualisasikan lokasi anomali melalui matriks peta panas (\textit{heatmap}) temporal, sebaran \textit{hotspot} pada peta risiko geospasial, serta ringkasan agregat seperti Peringkat Top 5 Jam Tersibuk. \\
-% \bottomrule
-% \end{tabularx}
-% \renewcommand{\arraystretch}{1.0}
-% \end{table}
-
-% % ============================================================
-% \subsection{Pola Lapangan dari \textit{Dashboard}}
-% \label{subsec:analisis-data-lapangan}
-% % ============================================================
-
-% Implementasi \textit{Data Mart} mengekstraksi wawasan operasional dari data lapangan secara berulang. Data yang dipakai adalah hasil inferensi YOLOv8 dari aliran CCTV Kamera Gerbang Utama 1, bukan data sintetis. Pengamatan berlangsung selama 10 jam operasional pada hari kerja (07.00--17.00 WIB). Pembahasan berikut menguraikan keluaran tiap panel \textit{dashboard} untuk menilai peran sistem sebagai pendukung pengambilan keputusan.
-
 % 
 \subsubsection{Fluktuasi Pelanggaran per 15 Menit}
 \label{subsubsec:analisis-dinamika-15m}
