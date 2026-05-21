@@ -557,10 +557,10 @@ Batch 2--7 & \textit{Empty / Idle} & 0 baris & 0 ms & 0 baris/detik \\
 \end{tabularx}
 \end{table}
 
-% \section{\textit{Data Mart} dan Visualisasi Analitik}
+\section{\textit{Data Mart} dan Visualisasi Analitik}
 \label{sec:data-mart}
 
-Subbab ini menguraikan tiga pilar transformasi data. Pertama, implementasi gudang penyimpanan analitik berbasis skema bintang (\textit{star schema}) pada PostgreSQL. Kedua, perancangan antarmuka dasbor interaktif (\textit{real-time dashboard}) menggunakan Grafana. Ketiga, evaluasi analitik atas rekaman operasional lapangan untuk memvalidasi peran sistem sebagai Sistem Pendukung Keputusan (\textit{Decision Support System}) dalam manajemen keselamatan kampus.
+Subbab ini membahas tiga pilar transformasi data di hilir \textit{pipeline} deteksi. Pertama, implementasi gudang analitik berbasis skema bintang (\textit{star schema}) pada PostgreSQL yang menampung 2.301.002 baris kejadian pelanggaran sepanjang tahun 2025 dari tiga kamera operasional. Kedua, evaluasi kinerja kueri (\textit{query benchmark}) yang membuktikan strategi indeks dan denormalisasi temporal mampu memenuhi kebutuhan dasbor \textit{near real-time}. Ketiga, perancangan antarmuka dasbor interaktif berbasis Grafana lengkap dengan pembacaan pola operasional dari rekaman 10 jam pengamatan lapangan, sebagai bukti peran sistem sebagai Sistem Pendukung Keputusan (\textit{Decision Support System}) dalam manajemen keselamatan kampus.
 
 % 
 \subsection{Skema Bintang \textit{Data Mart}}
@@ -645,14 +645,131 @@ Berdasarkan Tabel~\ref{tab:klasifikasi-measure-dw}, \texttt{violation\_count} me
 Sebaliknya, \texttt{confidence} dan \texttt{processing\_latency\_ms} tidak diperlakukan sebagai \textit{additive measure}. Penjumlahan nilai \textit{confidence} tidak memiliki makna analitik karena angka tersebut merepresentasikan tingkat keyakinan model pada satu kejadian. Oleh karena itu, kueri \textit{dashboard} menggunakan rata-rata, nilai minimum, dan nilai maksimum untuk menilai stabilitas model. Prinsip yang sama berlaku pada latensi: rata-rata latensi menunjukkan beban komputasi normal, sedangkan nilai maksimum dapat menandai lonjakan beban atau keterlambatan pemrosesan.
 
 
-\subsubsection{Evaluasi Kinerja \textit{Query} \textit{Data Mart}}
-\label{subsubsec:evaluasi-kinerja-dwh}
+\subsection{Evaluasi Kinerja Kueri \textit{Data Mart}}
+\label{subsec:evaluasi-kueri-datamart}
 
+Skema bintang yang telah dirinci pada Sub-bab~\ref{subsec:implementasi-star-schema} perlu dibuktikan tidak hanya rapi secara konseptual, melainkan juga responsif ketika dieksekusi pada volume produksi. Pengujian dilakukan dengan \texttt{EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)} di PostgreSQL terhadap \texttt{fact\_violations} yang berisi 2.301.002 baris kejadian pelanggaran sepanjang tahun 2025 dari tiga kamera aktif. Sebanyak 22 kueri \textit{benchmark} dijalankan untuk mencakup tiga peran utama yang dilayani \textit{data mart}: pemantauan harian dasbor, agregasi periodik, dan ringkasan statistik tahunan. Target kinerja dirumuskan sederhana: kueri yang melayani panel dasbor diharapkan selesai di bawah ambang 50 ms supaya interval penyegaran 10 detik tetap mulus, sedangkan kueri agregat periodik dapat ditoleransi pada rentang ratusan milidetik.
 
-\subsubsubsection{Evaluasi Ukuran Data dan Index}
+\subsubsection{Volume Data dan Profil Indeks}
+\label{subsubsec:volume-indeks}
 
+Tabel~\ref{tab:dwh-volume} menyajikan ukuran fisik tabel fakta dan tiga tabel dimensi yang menjadi target kueri \textit{benchmark}. Tabel \texttt{fact\_violations} menempati 476 MB ruang tabel dan 274 MB ruang indeks, sedangkan ketiga dimensi gabungannya tidak menyentuh 500 kB. Rasio ukuran tabel fakta terhadap total dimensi mencapai sekitar 1.000$:$1, sebuah angka yang menegaskan karakter sah skema bintang---tabel fakta tumbuh memanjang seiring waktu, sementara dimensi tetap kompak. Rasio indeks terhadap tabel fakta sebesar 57\% terlihat besar pada pandangan pertama, namun masih dalam rentang wajar bagi gudang analitik dengan beragam pola akses berbasis tanggal, jam, kamera, dan periode harian. Tabel \texttt{fact\_violations\_stage} sengaja dibiarkan kosong setelah \texttt{upsert\_fact\_violations\_stage()} memindahkan seluruh baris pendaratan ke tabel fakta utama.
 
-\subsubsubsection{Evaluasi Kinerja Query Dashboard}
+\begin{table}[htbp]
+\centering
+\caption{Volume data dan ukuran indeks tabel fakta dan dimensi \textit{data mart}.}
+\label{tab:dwh-volume}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{4.2cm} >{\raggedleft\arraybackslash}p{2.6cm} >{\raggedleft\arraybackslash}p{2.6cm} >{\raggedleft\arraybackslash}X}
+\toprule
+\textbf{Tabel} & \textbf{Baris Estimasi} & \textbf{Ukuran Tabel} & \textbf{Ukuran Indeks} \\
+\midrule
+\texttt{fact\_violations}       & 2.301.002 & 476 MB      & 274 MB      \\
+\texttt{dim\_date}              & 5.844     & 424 kB      & 144 kB      \\
+\texttt{dim\_camera}            & 3         & 8.192 byte  & 32 kB       \\
+\texttt{dim\_violation\_type}   & 1         & 8.192 byte  & 32 kB       \\
+\texttt{fact\_violations\_stage}& 0         & 0 byte      & 8.192 byte  \\
+\bottomrule
+\end{tabularx}
+\renewcommand{\arraystretch}{1.0}
+\end{table}
+
+Distribusi pemakaian indeks pada \texttt{fact\_violations} dapat dibaca dari Tabel~\ref{tab:dwh-index-stats}. Indeks \texttt{idx\_fv\_date} dan \texttt{idx\_fv\_date\_hour\_camera} mendominasi dengan masing-masing 45 dan 40 pemindaian, sehingga keduanya menyerap pola kueri terbesar: penyaringan satu hari dan agregasi jam$\times$kamera. Indeks \texttt{idx\_fv\_event\_timestamp} dipakai 11 kali untuk panel \textit{recent violations} yang membutuhkan urutan kronologis, sementara \texttt{idx\_fv\_time\_period} (9 pemindaian) menjadi tulang punggung agregasi periode pagi--malam. Sebaliknya, indeks \textit{cold} seperti \texttt{idx\_fv\_created\_at\_brin} dan \texttt{fact\_violations\_pkey} tidak tersentuh \textit{benchmark} karena tidak ada kueri rentang berbasis stempel waktu pencatatan maupun pencarian per kunci utama. Kedua indeks dingin tersebut tetap dipertahankan untuk arsip jangka panjang dan integritas referensial, bukan untuk performa kueri sehari-hari. Pemisahan jelas antara indeks panas dan dingin ini memperlihatkan rancangan indeks sudah selaras dengan pola akses yang sesungguhnya, bukan sekadar disebar ke banyak kolom.
+
+\begin{table}[htbp]
+\centering
+\caption{Profil pemakaian indeks pada \texttt{fact\_violations} hasil \texttt{pg\_stat\_user\_indexes}.}
+\label{tab:dwh-index-stats}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{5.4cm} >{\raggedleft\arraybackslash}p{1.6cm} >{\raggedleft\arraybackslash}p{2.6cm} >{\raggedleft\arraybackslash}X}
+\toprule
+\textbf{Indeks} & \textbf{Scan} & \textbf{Tuple Dibaca} & \textbf{Ukuran} \\
+\midrule
+\texttt{uq\_fv\_event\_id}          & 3.001 & 0           & 130 MB \\
+\texttt{idx\_fv\_date}               & 45    & 3.100.828   & 15 MB  \\
+\texttt{idx\_fv\_date\_hour\_camera} & 40    & 9.293.389   & 17 MB  \\
+\texttt{idx\_fv\_event\_timestamp}   & 11    & 6.955.824   & 17 MB  \\
+\texttt{idx\_fv\_time\_period}       & 9     & 6.900.285   & 14 MB  \\
+\texttt{idx\_fv\_created\_at}        & 4     & 400         & 17 MB  \\
+\texttt{idx\_fv\_camera\_fk}         & 3     & 6.901.285   & 14 MB  \\
+\texttt{idx\_fv\_created\_at\_brin}  & 0     & 0           & 32 kB  \\
+\texttt{fact\_violations\_pkey}      & 0     & 0           & 49 MB  \\
+\bottomrule
+\end{tabularx}
+\renewcommand{\arraystretch}{1.0}
+\end{table}
+
+Perlu disampaikan terbuka, indeks unik \texttt{uq\_fv\_event\_id} mencatat 3.001 pemindaian tanpa membaca \textit{tuple} satu pun (kolom \textit{tuples read} dan \textit{tuples fetched} bernilai nol). Angka tersebut bukan tanda indeks bekerja sia-sia, melainkan jejak proses \textit{upsert} yang memanfaatkan indeks untuk memverifikasi keberadaan \texttt{event\_id} sebelum penyisipan. Konflik diselesaikan dengan \texttt{ON CONFLICT DO NOTHING} sehingga tidak ada baris yang perlu diambil. Mekanisme ini menjadi penjaga utama agar kejadian yang sama tidak masuk dua kali jika pengaman \textit{deduplication} di sisi pengolah aliran terlewat.
+
+\subsubsection{Klasifikasi Waktu Eksekusi Kueri}
+\label{subsubsec:klasifikasi-kueri}
+
+Tabel~\ref{tab:dwh-query-detail} merinci waktu eksekusi 22 kueri \textit{benchmark} terhadap \texttt{fact\_violations}, dikelompokkan menjadi tiga tingkatan berdasarkan perannya pada lapisan presentasi. Kelompok pertama (\textit{tier} 1) yang selesai di bawah 50 ms melayani panel yang harus segar di hadapan operator, mulai dari KPI satu hari hingga peringkat jam tersibuk. Kelompok kedua (\textit{tier} 2) antara 100 ms dan 1 detik menampung agregasi rentang panjang yang lazimnya dipanggil saat operator membuka dasbor atau menarik laporan harian. Kelompok ketiga (\textit{tier} 3) yang menembus 1 detik dijaga tetap kecil dan diperuntukkan bagi ringkasan tahunan dan peta geospasial bertingkat yang memang tidak perlu dipanggil setiap penyegaran.
+
+\begin{table}[htbp]
+\centering
+\caption{Waktu eksekusi 22 kueri \textit{benchmark} pada \texttt{fact\_violations} 2,3 juta baris, dikelompokkan per \textit{tier}.}
+\label{tab:dwh-query-detail}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{1.1cm} >{\RaggedRight\arraybackslash}X >{\raggedleft\arraybackslash}p{2.4cm}}
+\toprule
+\textbf{Kode} & \textbf{Nama / Peran Kueri} & \textbf{Waktu (ms)} \\
+\midrule
+\multicolumn{3}{l}{\textit{Tier} 1 (cepat, $<$50 ms)\,---\,panel \textit{real-time} dasbor} \\
+\midrule
+BM-02 & \texttt{violations\_today} 1 hari (\texttt{idx\_fv\_date})              & 0,95   \\
+BM-15 & \texttt{vw\_daily\_cumulative} (akumulasi harian)                       & 5,57   \\
+BM-19 & Statistik penggunaan indeks (katalog)                                   & 5,90   \\
+BM-06 & \texttt{vw\_daily\_15min\_breakdown} (1 hari, 15 menit)                 & 8,65   \\
+BM-05 & \texttt{vw\_daily\_hourly\_timeline} (\textit{drill-down} 1 hari)       & 9,72   \\
+BM-17 & \texttt{vw\_recent\_violations} (\texttt{ORDER BY LIMIT} 100)           & 10,13  \\
+BM-14 & \texttt{vw\_daily\_peak\_analysis} (peringkat jam)                      & 10,73  \\
+BM-13 & \texttt{vw\_daily\_camera\_geomap} per-tanggal                          & 29,03  \\
+BM-00 & Ukuran tabel dan indeks (katalog)                                       & 44,84  \\
+\midrule
+\multicolumn{3}{l}{\textit{Tier} 2 (sedang, 100--1.000 ms)\,---\,agregasi periodik dan laporan harian} \\
+\midrule
+BM-03 & Rentang \texttt{BETWEEN} 3 bulan (indeks komposit)                      & 103,92  \\
+BM-08 & \texttt{vw\_time\_period\_distribution}                                 & 316,05  \\
+BM-07 & \texttt{vw\_heatmap\_hour\_day} (24$\times$7)                           & 359,53  \\
+BM-10 & \texttt{vw\_hourly\_bar} (24 jam)                                       & 402,72  \\
+BM-09 & \texttt{vw\_confidence\_distribution}                                   & 420,31  \\
+BM-04 & \texttt{vw\_daily\_trend} (365 hari)                                    & 443,25  \\
+BM-01 & \texttt{vw\_kpi\_summary} (agregat tahunan)                             & 663,03  \\
+BM-16 & \texttt{vw\_daily\_narrative} (\textit{auto-summary})                   & 794,85  \\
+BM-18 & \textit{Staging upsert} 1.000 baris                                     & 945,59  \\
+BM-21 & Pelanggaran per \texttt{time\_period} (2025)                            & 948,15  \\
+BM-11 & \texttt{vw\_camera\_stats} (\texttt{JOIN dim\_camera})                  & 1.024,72 \\
+\midrule
+\multicolumn{3}{l}{\textit{Tier} 3 (berat, $>$1.000 ms)\,---\,ringkasan tahunan dan analisis geospasial} \\
+\midrule
+BM-20 & Statistik ringkas DWH (1 tahun, persentil)                              & 6.559,35 \\
+BM-12 & \texttt{vw\_camera\_geomap} (\textit{window function})                  & 6.949,09 \\
+\bottomrule
+\end{tabularx}
+\renewcommand{\arraystretch}{1.0}
+\end{table}
+
+Kontras paling tajam pada Tabel~\ref{tab:dwh-query-detail} terlihat antara BM-02 yang selesai dalam 0,95 ms dan BM-12 yang menuntut 6.949 ms, meski keduanya membaca tabel yang sama. BM-02 memanfaatkan \texttt{idx\_fv\_date} sebagai \textit{Index Scan} dengan hanya tiga \textit{buffer} yang dibaca, sehingga praktis tidak menyentuh disk. BM-12 sebaliknya menelusuri seluruh tabel untuk pivot per-kamera lalu menjalankan \textit{window function} \texttt{ROW\_NUMBER()} bertingkat sehingga menyentuh puluhan ribu \textit{buffer}. Perbandingan ini menegaskan bahwa biaya kueri tidak ditentukan oleh besarnya tabel semata, melainkan oleh keselarasan klausa \texttt{WHERE} dengan indeks yang tersedia.
+
+Sembilan kueri pada \textit{tier} 1 ditopang oleh klausa \texttt{WHERE date = ?} atau \texttt{WHERE date BETWEEN ? AND ?} satu hari, sehingga perencana kueri memilih \textit{Index Scan} pada \texttt{idx\_fv\_date} atau \textit{Index Only Scan} dengan \textit{tuple fetch} rendah. Pengembangan agregasi 15 menit pada BM-06, misalnya, menyelesaikan \texttt{HashAggregate} pada memori 217 kB tanpa mengeluarkan \textit{batch} sekunder, sehingga waktu eksekusi bertahan di 8,65 ms. Pola seperti inilah yang membuat dasbor mampu menyegarkan panel detail tanpa membebani basis data.
+
+Kelompok \textit{tier} 2 dipenuhi kueri rentang panjang yang memerlukan \textit{Parallel Seq Scan} dengan dua \textit{worker} tambahan. BM-04 yang mengagregasi 365 hari memakai 443 ms dan menyentuh 61.002 \textit{buffer}; BM-01 yang mengisi panel ringkasan KPI tahunan butuh 663 ms dengan rencana \textit{Nested Loop} di atas \textit{Finalize Aggregate}. Meskipun lebih lambat dari \textit{tier} 1, biaya tersebut tetap terterima karena kueri-kueri ini dijalankan saat operator membuka panel ringkasan atau membentuk laporan harian, bukan pada polling kontinu setiap 10 detik. BM-21 yang mengelompokkan pelanggaran per periode harian mengonsumsi 948 ms karena melibatkan agregat jendela penuh dan kalkulasi persentase di tingkat SQL; biaya ini akan menyusut signifikan bila dipindahkan ke \textit{materialized view} dengan penyegaran setiap akhir hari.
+
+Dua kueri pada \textit{tier} 3 layak diberi perhatian khusus. BM-20 yang menghitung ringkasan statistik DWH (rerata, simpangan baku, persentil ke-95 dan ke-99 latensi) merangkum belasan agregat sekaligus pada 2,3 juta baris, sehingga total waktu mencapai 6,5 detik. Sementara itu, BM-12 yang merangkai pivot kamera dengan \textit{window function} \texttt{ROW\_NUMBER()} untuk \textit{geomap} menuntut 6,9 detik karena perencana memilih \textit{Sort} ber-\textit{external memory} dan satu \textit{HashAggregate} bertingkat. Kedua kueri ini sengaja tidak ditargetkan untuk dasbor harian; mereka diposisikan sebagai laporan periodik akhir minggu atau bahan presentasi tahunan, sehingga waktu eksekusi yang panjang dapat ditoleransi. Versi cepatnya, BM-13 yang menambahkan \texttt{WHERE date = ?} pada kueri \textit{geomap} yang sama, hanya membutuhkan 29 ms---kontras lebih dari 200$\times$. Pola ini menjadi templat ketika operator menginginkan tampilan peta untuk satu hari operasional tertentu.
+
+\subsubsection{\textit{Throughput} Tulis dan Implikasi Operasional}
+\label{subsubsec:throughput-tulis}
+
+Pengujian sisi tulis mengukur kapasitas jalur \texttt{fact\_violations\_stage} sebagai pendaratan \textit{micro-batch} sebelum dipromosikan ke tabel fakta. Skenario BM-18 menyiapkan 1.000 baris pada tabel \textit{staging}, kemudian memanggil prosedur \texttt{upsert\_fact\_violations\_stage()} yang menyalin baris baru ke \texttt{fact\_violations} dengan \texttt{ON CONFLICT DO NOTHING} pada \texttt{event\_id}. Operasi rampung dalam 891,3 ms dengan \textit{throughput} efektif 1.122 baris/detik. Kapasitas tulis sebesar itu jauh melampaui kebutuhan rata-rata satu pelanggaran per 3 menit per kamera pada jam sibuk kampus, sehingga lonjakan beban tetap aman tanpa antrean \textit{micro-batch} membengkak.
+
+Rangkuman gabungan menunjukkan 16 dari 22 kueri (73\%) selesai dalam 500 ms atau kurang, yang berarti seluruh panel utama dasbor dapat dipenuhi dari kueri tunggal terhadap \texttt{fact\_violations} tanpa membutuhkan lapisan \textit{materialized view} tambahan. \textit{Trade-off} yang ada bersifat eksplisit, yaitu dua kueri statistik tahunan dan satu kueri geospasial dibiarkan berat karena memang dipanggil jarang dan tidak menghalangi penyegaran panel operasional. Tiga konsekuensi praktis menutup pembahasan ini. Pertama, panel dasbor utama dapat ditargetkan menyegar setiap 5--10 detik karena seluruh kueri pendukungnya berada pada \textit{tier} 1 dan \textit{tier} 2 yang aman terhadap polling cepat. Kedua, indeks \texttt{idx\_fv\_date} dan \texttt{idx\_fv\_date\_hour\_camera} menjadi prioritas pertama dalam pengelolaan rutin (\textit{REINDEX} dan \texttt{VACUUM ANALYZE}) karena perubahan pola akses akan paling cepat tercermin pada kinerja keduanya. Ketiga, ringkasan tahunan dan peta geospasial bertingkat perlu disiapkan sebagai \textit{materialized view} berjadwal bila dasbor diperluas untuk menyajikan laporan tahunan secara interaktif, bukan dijalankan ulang sebagai kueri ad-hoc setiap halaman dibuka. Dengan kinerja kueri yang sudah terpetakan, Sub-bab~\ref{subsec:visualisasi-dashboard} berikutnya dapat membahas rancangan panel dasbor tanpa mengkhawatirkan beban basis data sebagai \textit{bottleneck} tersembunyi.
 
 
 \subsection{Visualisasi \textit{Dashboard} Analitik}
